@@ -42,23 +42,33 @@ export function useCalculator() {
   const calculations = useMemo((): CalculationResult => {
     const activeAppliances = selectedAppliances.filter(a => a.quantity > 0);
 
-    // Total running load
+    // 1. Continuous Load = Σ (wattage × quantity)
     const totalLoad = activeAppliances.reduce(
       (sum, a) => sum + a.wattage * a.quantity,
       0
     );
 
-    // Peak surge load (max surge from any single appliance type)
-    const peakSurge = activeAppliances.reduce(
-      (max, a) => Math.max(max, a.wattage * a.surge * a.quantity),
+    // 2. Effective Surge = max(wattage × (surge - 1)) - avoids double counting running power
+    const effectiveSurge = activeAppliances.reduce(
+      (max, a) => Math.max(max, a.wattage * (a.surge - 1) * a.quantity),
       0
     );
 
-    // Required power with safety margin (30%)
-    const requiredPower = (totalLoad + peakSurge) * 1.3;
+    // 3. Surge Diversity Factor (residential default: 0.5)
+    const surgeDiversityFactor = 0.5;
+    const adjustedSurge = effectiveSurge * surgeDiversityFactor;
 
-    // Convert to kVA (power factor 0.8)
-    const requiredKva = requiredPower / 800;
+    // 4. Required Power = Continuous Load + Adjusted Surge
+    const requiredPower = totalLoad + adjustedSurge;
+
+    // 5. Safety Margin = 20% (reduced due to realistic modeling)
+    const finalPower = requiredPower * 1.2;
+
+    // 6. Convert to kVA (power factor 0.8)
+    const requiredKva = finalPower / 800;
+
+    // Peak surge for display (the effective surge before diversity factor)
+    const peakSurge = effectiveSurge;
 
     // Find recommended inverter size
     const recommendedInverter = inverterSizes.find(size => size >= requiredKva) || inverterSizes[inverterSizes.length - 1];

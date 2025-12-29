@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Zap, Activity, AlertTriangle, Lightbulb, Download, RotateCcw } from 'lucide-react';
+import { Zap, Activity, AlertTriangle, Lightbulb, Download, RotateCcw, MessageCircle, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatCard } from './StatCard';
@@ -137,6 +137,36 @@ export const ResultsPanel = memo(function ResultsPanel({
           <p className="text-sm">Select appliances to see your power requirements</p>
         </div>
       )}
+
+      {/* Expert CTA */}
+      <Card className="border-primary/20 bg-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
+        <CardContent className="pt-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            If you plan to run very heavy equipment, or devices not listed in this calculator, please consult a qualified inverter engineer.
+          </p>
+          <p className="text-sm font-medium text-foreground">
+            Get expert guidance, avoid costly mistakes, and install the right system the first time.
+          </p>
+          <div className="flex gap-3 pt-1">
+            <Button
+              variant="default"
+              className="flex-1"
+              onClick={() => window.open('https://wa.me/2349074243753', '_blank')}
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              WhatsApp
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => window.open('mailto:devidfirm@gmail.com', '_blank')}
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Email
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 });

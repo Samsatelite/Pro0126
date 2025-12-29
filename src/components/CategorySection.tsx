@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ApplianceCard } from './ApplianceCard';
 import type { ApplianceWithQuantity } from '@/data/appliances';
-import { applianceCategories } from '@/data/appliances';
+import { applianceCategories, allowedCombinations } from '@/data/appliances';
 
 const iconMap: Record<string, LucideIcon> = {
   Lightbulb,
@@ -21,18 +21,68 @@ const iconMap: Record<string, LucideIcon> = {
   Zap,
 };
 
+// Check if an appliance can be combined with currently selected ones
+function canSelectAppliance(
+  applianceId: string, 
+  appliance: ApplianceWithQuantity,
+  selectedHeavyDutyIds: string[],
+  hasSoloOnlySelected: boolean
+): { canSelect: boolean; reason?: string } {
+  // Non-heavy-duty can always be selected
+  if (!appliance.isHeavyDuty) {
+    return { canSelect: true };
+  }
+
+  // If this appliance is already selected, it can be deselected
+  if (appliance.quantity > 0) {
+    return { canSelect: true };
+  }
+
+  // If a solo-only appliance is selected, nothing else can be added
+  if (hasSoloOnlySelected) {
+    return { canSelect: false, reason: 'Solo appliance selected' };
+  }
+
+  // If this is a solo-only appliance and something else is selected
+  if (appliance.soloOnly && selectedHeavyDutyIds.length > 0) {
+    return { canSelect: false, reason: 'Must be used alone' };
+  }
+
+  // If we already have 2 heavy-duty, can't add more
+  if (selectedHeavyDutyIds.length >= 2) {
+    return { canSelect: false, reason: 'Max 2 heavy-duty' };
+  }
+
+  // If we have 1 heavy-duty, check if this one is compatible
+  if (selectedHeavyDutyIds.length === 1) {
+    const existingId = selectedHeavyDutyIds[0];
+    const isCompatible = allowedCombinations.some(
+      ([a, b]) => (a === existingId && b === applianceId) || (a === applianceId && b === existingId)
+    );
+    
+    if (!isCompatible) {
+      return { canSelect: false, reason: 'Not compatible' };
+    }
+  }
+
+  return { canSelect: true };
+}
+
 interface CategorySectionProps {
   categoryId: string;
   appliances: ApplianceWithQuantity[];
   onUpdateQuantity: (id: string, quantity: number) => void;
   hasHeavyDutySelected?: boolean;
+  hasSoloOnlySelected?: boolean;
+  selectedHeavyDutyIds?: string[];
 }
 
 export const CategorySection = memo(function CategorySection({
   categoryId,
   appliances,
   onUpdateQuantity,
-  hasHeavyDutySelected = false,
+  hasSoloOnlySelected = false,
+  selectedHeavyDutyIds = [],
 }: CategorySectionProps) {
   const category = applianceCategories.find(c => c.id === categoryId);
   if (!category) return null;
@@ -58,20 +108,32 @@ export const CategorySection = memo(function CategorySection({
       </div>
 
       {isHeavyDutyCategory && (
-        <p className="text-xs text-destructive mb-3 bg-destructive/5 p-2 rounded-md">
-          ⚠️ Only ONE heavy-duty appliance allowed at a time for accurate inverter sizing.
-        </p>
+        <div className="text-xs text-muted-foreground mb-3 bg-muted/50 p-3 rounded-md space-y-1">
+          <p className="font-medium text-foreground">Selection Rules:</p>
+          <p>• <span className="text-warning font-medium">Solo</span> appliances must be used alone</p>
+          <p>• Other heavy-duty: max 2 compatible appliances</p>
+        </div>
       )}
       
       <div className="grid gap-2">
-        {appliances.map(appliance => (
-          <ApplianceCard
-            key={appliance.id}
-            appliance={appliance}
-            onUpdateQuantity={onUpdateQuantity}
-            isDisabled={isHeavyDutyCategory && hasHeavyDutySelected && appliance.quantity === 0}
-          />
-        ))}
+        {appliances.map(appliance => {
+          const { canSelect, reason } = canSelectAppliance(
+            appliance.id, 
+            appliance, 
+            selectedHeavyDutyIds, 
+            hasSoloOnlySelected
+          );
+          
+          return (
+            <ApplianceCard
+              key={appliance.id}
+              appliance={appliance}
+              onUpdateQuantity={onUpdateQuantity}
+              isDisabled={!canSelect}
+              disabledReason={reason}
+            />
+          );
+        })}
       </div>
     </div>
   );

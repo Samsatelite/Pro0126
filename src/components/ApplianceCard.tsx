@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Minus, Plus, AlertTriangle } from 'lucide-react';
+import { Minus, Plus, AlertTriangle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { ApplianceWithQuantity } from '@/data/appliances';
@@ -9,15 +9,18 @@ interface ApplianceCardProps {
   appliance: ApplianceWithQuantity;
   onUpdateQuantity: (id: string, quantity: number) => void;
   isDisabled?: boolean;
+  disabledReason?: string;
 }
 
 export const ApplianceCard = memo(function ApplianceCard({
   appliance,
   onUpdateQuantity,
   isDisabled = false,
+  disabledReason,
 }: ApplianceCardProps) {
   const isActive = appliance.quantity > 0;
   const isHeavyDuty = appliance.isHeavyDuty;
+  const isSoloOnly = appliance.soloOnly;
 
   return (
     <Card
@@ -28,7 +31,13 @@ export const ApplianceCard = memo(function ApplianceCard({
       )}
     >
       {isHeavyDuty && (
-        <div className="absolute -top-1 -right-1">
+        <div className="absolute -top-1 -right-1 flex gap-1">
+          {isSoloOnly && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-warning text-warning-foreground rounded">
+              <Ban className="h-2.5 w-2.5" />
+              Solo
+            </span>
+          )}
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-destructive text-destructive-foreground rounded">
             <AlertTriangle className="h-2.5 w-2.5" />
             Heavy
@@ -51,6 +60,9 @@ export const ApplianceCard = memo(function ApplianceCard({
             </span>
           )}
         </p>
+        {isDisabled && disabledReason && (
+          <p className="text-[10px] text-destructive mt-1">{disabledReason}</p>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

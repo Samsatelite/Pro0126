@@ -16,6 +16,8 @@ const Index = () => {
     calculations,
     activeCount,
     hasHeavyDutySelected,
+    hasSoloOnlySelected,
+    selectedHeavyDutyIds,
   } = useCalculator();
 
   const appliancesByCategory = useMemo(() => {
@@ -74,6 +76,8 @@ const Index = () => {
                       appliances={cat.appliances}
                       onUpdateQuantity={updateQuantity}
                       hasHeavyDutySelected={hasHeavyDutySelected}
+                      hasSoloOnlySelected={hasSoloOnlySelected}
+                      selectedHeavyDutyIds={selectedHeavyDutyIds}
                     />
                   ))}
                 </div>

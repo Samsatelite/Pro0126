@@ -15,7 +15,7 @@ interface PDFData {
 export function generatePDFContent(data: PDFData): string {
   const activeAppliances = data.appliances.filter(a => a.quantity > 0);
   const regularAppliances = activeAppliances.filter(a => !a.isHeavyDuty);
-  const heavyDutyAppliance = activeAppliances.find(a => a.isHeavyDuty);
+  const heavyDutyAppliances = activeAppliances.filter(a => a.isHeavyDuty);
   
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -91,6 +91,7 @@ export function generatePDFContent(data: PDFData): string {
     th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
     th { background: #f8f9fa; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #666; }
     .heavy-badge { background: #dc2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+    .solo-badge { background: #f59e0b; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; }
     .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 10px 0; border-radius: 0 8px 8px 0; }
     .recommendation-box { background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 10px 0; border-radius: 0 8px 8px 0; }
     .list-item { margin: 8px 0; padding-left: 15px; position: relative; }
@@ -114,7 +115,7 @@ export function generatePDFContent(data: PDFData): string {
         <div class="stat-unit">Watts</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Peak Surge</div>
+        <div class="stat-label">Adjusted Surge</div>
         <div class="stat-value">${data.calculations.peakSurge.toLocaleString()}</div>
         <div class="stat-unit">Watts</div>
       </div>
@@ -146,14 +147,14 @@ export function generatePDFContent(data: PDFData): string {
             <td>${a.wattage * a.quantity}W</td>
           </tr>
         `).join('')}
-        ${heavyDutyAppliance ? `
+        ${heavyDutyAppliances.map(a => `
           <tr>
-            <td>${heavyDutyAppliance.name}<span class="heavy-badge">Heavy Duty</span></td>
-            <td>${heavyDutyAppliance.wattage}W</td>
+            <td>${a.name}<span class="heavy-badge">Heavy Duty</span>${a.soloOnly ? '<span class="solo-badge">Solo</span>' : ''}</td>
+            <td>${a.wattage}W</td>
             <td>1</td>
-            <td>${heavyDutyAppliance.wattage}W</td>
+            <td>${a.wattage}W</td>
           </tr>
-        ` : ''}
+        `).join('')}
       </tbody>
     </table>
   </div>
@@ -179,7 +180,7 @@ export function generatePDFContent(data: PDFData): string {
   <div class="disclaimer">
     <strong>Disclaimer:</strong> This report provides estimates for planning purposes only. 
     Actual power consumption may vary. Consult with a qualified solar installer for professional sizing recommendations.
-    Calculations include a 30% safety margin and assume a power factor of 0.8.
+    Calculations include a 20% safety margin, 50% surge diversity factor, and assume a power factor of 0.8.
   </div>
 
   <div class="footer">Solar Load Calculator • Professional Power Planning Tool</div>

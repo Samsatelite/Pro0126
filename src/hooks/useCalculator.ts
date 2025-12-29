@@ -1,5 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
-import { appliances, inverterSizes, type ApplianceWithQuantity } from '@/data/appliances';
+import { 
+  appliances, 
+  inverterSizes, 
+  allowedCombinations, 
+  getCombinationWarnings,
+  type ApplianceWithQuantity 
+} from '@/data/appliances';
+
+// Constants
+const POWER_FACTOR = 0.8;
+const SAFETY_MARGIN = 1.2; // 20% safety margin
+const SURGE_DIVERSITY = 0.5; // Only 50% of max surge applied
 
 interface CalculationResult {
   totalLoad: number;
@@ -9,7 +20,14 @@ interface CalculationResult {
   recommendedInverter: number;
   warnings: string[];
   recommendations: string[];
-  selectedHeavyDuty: ApplianceWithQuantity | null;
+  selectedHeavyDuty: ApplianceWithQuantity[];
+}
+
+// Helper to check if combination is allowed
+function isAllowedCombination(id1: string, id2: string): boolean {
+  return allowedCombinations.some(
+    ([a, b]) => (a === id1 && b === id2) || (a === id2 && b === id1)
+  );
 }
 
 export function useCalculator() {
@@ -20,10 +38,15 @@ export function useCalculator() {
   const updateQuantity = useCallback((id: string, quantity: number) => {
     setSelectedAppliances(prev => {
       const appliance = prev.find(a => a.id === id);
+      if (!appliance) return prev;
       
-      // If this is a heavy-duty appliance and we're selecting it
-      if (appliance?.isHeavyDuty && quantity > 0) {
-        // Reset all other heavy-duty appliances to 0, set this one to 1
+      // If deselecting, just update
+      if (quantity === 0) {
+        return prev.map(a => (a.id === id ? { ...a, quantity: 0 } : a));
+      }
+      
+      // If this is a solo-only appliance, reset all other heavy-duty
+      if (appliance.soloOnly && quantity > 0) {
         return prev.map(a => {
           if (a.id === id) return { ...a, quantity: 1 };
           if (a.isHeavyDuty) return { ...a, quantity: 0 };
@@ -31,6 +54,40 @@ export function useCalculator() {
         });
       }
       
+      // If selecting a heavy-duty appliance
+      if (appliance.isHeavyDuty && quantity > 0) {
+        const currentHeavyDuty = prev.filter(a => a.isHeavyDuty && a.quantity > 0);
+        
+        // If there's a solo-only appliance currently selected, reset it
+        const hasSoloSelected = currentHeavyDuty.some(a => a.soloOnly);
+        if (hasSoloSelected) {
+          return prev.map(a => {
+            if (a.id === id) return { ...a, quantity: 1 };
+            if (a.isHeavyDuty) return { ...a, quantity: 0 };
+            return a;
+          });
+        }
+        
+        // Check if this new selection is compatible with existing heavy-duty
+        if (currentHeavyDuty.length > 0) {
+          // Allow max 2 heavy-duty appliances that are in allowed combinations
+          const canAddMore = currentHeavyDuty.length < 2 && 
+            currentHeavyDuty.every(existing => isAllowedCombination(existing.id, id));
+          
+          if (!canAddMore) {
+            // Replace existing heavy-duty selections with this one
+            return prev.map(a => {
+              if (a.id === id) return { ...a, quantity: 1 };
+              if (a.isHeavyDuty) return { ...a, quantity: 0 };
+              return a;
+            });
+          }
+        }
+        
+        return prev.map(a => (a.id === id ? { ...a, quantity: 1 } : a));
+      }
+      
+      // For non-heavy-duty, just update quantity
       return prev.map(a => (a.id === id ? { ...a, quantity: Math.max(0, quantity) } : a));
     });
   }, []);
@@ -42,58 +99,82 @@ export function useCalculator() {
   const calculations = useMemo((): CalculationResult => {
     const activeAppliances = selectedAppliances.filter(a => a.quantity > 0);
 
-    // 1. Continuous Load = Σ (wattage × quantity)
+    // 1. Total running load = Σ (wattage × quantity)
     const totalLoad = activeAppliances.reduce(
       (sum, a) => sum + a.wattage * a.quantity,
       0
     );
 
-    // 2. Effective Surge = max(wattage × (surge - 1)) - avoids double counting running power
-    const effectiveSurge = activeAppliances.reduce(
-      (max, a) => Math.max(max, a.wattage * (a.surge - 1) * a.quantity),
-      0
+    // 2. Calculate effective surge per appliance (only those with surge > 1)
+    const surgeCandidates = activeAppliances
+      .filter(a => a.surge > 1 && a.quantity > 0)
+      .map(a => a.wattage * (a.surge - 1));
+
+    const maxSurge = surgeCandidates.length > 0 
+      ? Math.max(...surgeCandidates) 
+      : 0;
+
+    // 3. Apply diversity factor
+    const adjustedSurge = maxSurge * SURGE_DIVERSITY;
+
+    // 4. Required inverter power (Watts)
+    const rawRequiredPower = totalLoad + adjustedSurge;
+    const finalRequiredPower = rawRequiredPower * SAFETY_MARGIN;
+
+    // 5. Convert to kVA (divide by 1000 * power factor = 800)
+    const requiredKva = finalRequiredPower / (1000 * POWER_FACTOR);
+
+    // 6. Map to standard inverter sizes
+    const recommendedInverter = inverterSizes.find(size => size >= requiredKva) 
+      || inverterSizes[inverterSizes.length - 1];
+
+    // Get selected heavy duty appliances
+    const selectedHeavyDuty = activeAppliances.filter(a => a.isHeavyDuty);
+    const selectedHeavyDutyIds = selectedHeavyDuty.map(a => a.id);
+
+    // 7. Generate warnings
+    const warnings: string[] = [];
+
+    // Check for specific appliance combinations
+    const hasAC = activeAppliances.some(a => a.id.includes('ac') && a.quantity > 0);
+    const hasFridge = activeAppliances.some(a => a.id === 'refrigerator' && a.quantity > 0);
+    const hasHeating = activeAppliances.some(a => 
+      ['microwave', 'toaster'].includes(a.id) && a.quantity > 0
     );
 
-    // 3. Surge Diversity Factor (residential default: 0.5)
-    const surgeDiversityFactor = 0.5;
-    const adjustedSurge = effectiveSurge * surgeDiversityFactor;
+    if (hasAC && hasFridge) {
+      warnings.push('Running AC and refrigerator together increases load significantly.');
+    }
 
-    // 4. Required Power = Continuous Load + Adjusted Surge
-    const requiredPower = totalLoad + adjustedSurge;
+    if (hasHeating) {
+      warnings.push('Heating appliances significantly reduce battery backup time.');
+    }
 
-    // 5. Safety Margin = 20% (reduced due to realistic modeling)
-    const finalPower = requiredPower * 1.2;
+    if (adjustedSurge > totalLoad * 0.8) {
+      warnings.push('High motor startup load detected. Consider a higher inverter capacity.');
+    }
 
-    // 6. Convert to kVA (power factor 0.8)
-    const requiredKva = finalPower / 800;
+    // Add combination-specific warnings
+    const combinationWarnings = getCombinationWarnings(selectedHeavyDutyIds);
+    warnings.push(...combinationWarnings);
 
-    // Peak surge for display (the effective surge before diversity factor)
-    const peakSurge = effectiveSurge;
+    // Solo-only appliance warnings
+    const soloAppliance = selectedHeavyDuty.find(a => a.soloOnly);
+    if (soloAppliance) {
+      warnings.push(`${soloAppliance.name} should be used alone for optimal performance.`);
+    }
 
-    // Find recommended inverter size
-    const recommendedInverter = inverterSizes.find(size => size >= requiredKva) || inverterSizes[inverterSizes.length - 1];
-
-    // Get selected heavy duty appliance
-    const selectedHeavyDuty = activeAppliances.find(a => a.isHeavyDuty) || null;
-
-    // Generate warnings
-    const warnings: string[] = [];
+    // 8. Generate recommendations
     const recommendations: string[] = [];
 
-    if (selectedHeavyDuty) {
-      warnings.push(`Heavy-duty appliance selected: ${selectedHeavyDuty.name} (${selectedHeavyDuty.wattage}W). Do not run other heavy appliances concurrently.`);
-    }
-
-    if (peakSurge > requiredPower * 0.7) {
-      warnings.push('High surge load detected - consider staggering startup');
-    }
-
-    // Generate recommendations
     if (totalLoad > 0) {
       recommendations.push(`Recommended inverter: ${recommendedInverter} kVA for optimal performance`);
 
-      if (selectedHeavyDuty && selectedHeavyDuty.surge > 2) {
-        recommendations.push(`${selectedHeavyDuty.name} has high startup surge. Ensure inverter can handle ${(selectedHeavyDuty.wattage * selectedHeavyDuty.surge / 1000).toFixed(1)} kW peak.`);
+      const highSurgeAppliance = activeAppliances.find(a => a.surge >= 3);
+      if (highSurgeAppliance) {
+        recommendations.push(
+          `${highSurgeAppliance.name} has high startup surge. Ensure inverter can handle ${((highSurgeAppliance.wattage * highSurgeAppliance.surge) / 1000).toFixed(1)} kW peak.`
+        );
       }
 
       if (requiredKva > 5) {
@@ -102,10 +183,10 @@ export function useCalculator() {
     }
 
     return {
-      totalLoad,
-      peakSurge,
-      requiredPower,
-      requiredKva: Math.ceil(requiredKva * 10) / 10,
+      totalLoad: Math.round(totalLoad),
+      peakSurge: Math.round(adjustedSurge),
+      requiredPower: Math.round(finalRequiredPower),
+      requiredKva: Number(requiredKva.toFixed(2)),
       recommendedInverter,
       warnings,
       recommendations,
@@ -123,6 +204,17 @@ export function useCalculator() {
     [selectedAppliances]
   );
 
+  const hasSoloOnlySelected = useMemo(
+    () => selectedAppliances.some(a => a.soloOnly && a.quantity > 0),
+    [selectedAppliances]
+  );
+
+  // Get IDs of currently selected heavy-duty for compatibility checks
+  const selectedHeavyDutyIds = useMemo(
+    () => selectedAppliances.filter(a => a.isHeavyDuty && a.quantity > 0).map(a => a.id),
+    [selectedAppliances]
+  );
+
   return {
     selectedAppliances,
     updateQuantity,
@@ -130,5 +222,7 @@ export function useCalculator() {
     calculations,
     activeCount,
     hasHeavyDutySelected,
+    hasSoloOnlySelected,
+    selectedHeavyDutyIds,
   };
 }

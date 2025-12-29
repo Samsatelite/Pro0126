@@ -130,14 +130,6 @@ export const ResultsPanel = memo(function ResultsPanel({
         </Button>
       </div>
 
-      {/* Empty State */}
-      {!hasResults && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Zap className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">Select appliances to see your power requirements</p>
-        </div>
-      )}
-
       {/* Expert CTA */}
       <Card className="border-primary/20 bg-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
         <CardContent className="pt-4 space-y-3">

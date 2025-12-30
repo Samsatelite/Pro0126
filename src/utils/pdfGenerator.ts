@@ -102,7 +102,7 @@ export function generatePDFContent(data: PDFData): string {
 </head>
 <body>
   <div class="header">
-    <h1>☀️ Solar Inverter Load Report</h1>
+    <h1>Solar Inverter Load Report</h1>
     <p class="date">Generated on ${date}</p>
   </div>
 
@@ -161,7 +161,7 @@ export function generatePDFContent(data: PDFData): string {
 
   ${data.calculations.warnings.length > 0 ? `
   <div class="section">
-    <div class="section-title">⚠️ Warnings</div>
+    <div class="section-title">Warnings</div>
     <div class="warning-box">
       ${data.calculations.warnings.map(w => `<div class="list-item">${w}</div>`).join('')}
     </div>
@@ -170,7 +170,7 @@ export function generatePDFContent(data: PDFData): string {
 
   ${data.calculations.recommendations.length > 0 ? `
   <div class="section">
-    <div class="section-title">💡 Recommendations</div>
+    <div class="section-title">Recommendations</div>
     <div class="recommendation-box">
       ${data.calculations.recommendations.map(r => `<div class="list-item">${r}</div>`).join('')}
     </div>
@@ -183,7 +183,7 @@ export function generatePDFContent(data: PDFData): string {
     Calculations include a 20% safety margin, 50% surge diversity factor, and assume a power factor of 0.8.
   </div>
 
-  <div class="footer">Solar Load Calculator • Professional Power Planning Tool</div>
+  <div class="footer">InverterSize - Professional Power Planning Tool</div>
 </body>
 </html>
   `;

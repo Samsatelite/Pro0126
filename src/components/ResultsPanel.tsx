@@ -3,7 +3,7 @@ import { Zap, Activity, AlertTriangle, Lightbulb, Download, RotateCcw } from 'lu
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatCard } from './StatCard';
-import { ContactForm } from './ContactForm';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface ResultsPanelProps {
@@ -142,7 +142,12 @@ export const ResultsPanel = memo(function ResultsPanel({
               Get expert guidance, avoid costly mistakes, and install the right system the first time.
             </p>
           </div>
-          <ContactForm />
+          <Link 
+            to="/contact" 
+            className="inline-block text-primary hover:text-primary/80 font-medium text-sm underline underline-offset-4 transition-colors"
+          >
+            Contact an Expert
+          </Link>
         </CardContent>
       </Card>
     </div>

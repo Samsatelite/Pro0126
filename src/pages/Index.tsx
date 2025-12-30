@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { CategorySection } from '@/components/CategorySection';
 import { ResultsPanel } from '@/components/ResultsPanel';
@@ -20,6 +20,26 @@ const Index = () => {
     selectedHeavyDutyIds,
   } = useCalculator();
 
+  // Store sizing data in sessionStorage for the contact form
+  useEffect(() => {
+    if (activeCount > 0) {
+      const sizingData = {
+        appliances: selectedAppliances.filter(a => a.quantity > 0).map(a => ({
+          name: a.name,
+          wattage: a.wattage,
+          quantity: a.quantity,
+        })),
+        calculations: {
+          totalLoad: calculations.totalLoad,
+          peakSurge: calculations.peakSurge,
+          requiredKva: calculations.requiredKva,
+          recommendedInverter: calculations.recommendedInverter,
+        },
+      };
+      sessionStorage.setItem('inverterSizingData', JSON.stringify(sizingData));
+    }
+  }, [selectedAppliances, calculations, activeCount]);
+
   const appliancesByCategory = useMemo(() => {
     return applianceCategories.map(cat => ({
       ...cat,
@@ -37,7 +57,7 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>Solar Load Calculator - Plan Your Inverter Setup</title>
+        <title>InverterSize - Plan Your Inverter Setup</title>
         <meta 
           name="description" 
           content="Calculate your solar inverter size. Select your appliances and get instant recommendations for your power backup system." 

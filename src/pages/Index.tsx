@@ -1,14 +1,15 @@
 import { useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { CategorySection } from '@/components/CategorySection';
 import { ResultsPanel } from '@/components/ResultsPanel';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCalculator } from '@/hooks/useCalculator';
 import { applianceCategories } from '@/data/appliances';
-import { downloadPDF } from '@/utils/pdfGenerator';
 import { Helmet } from 'react-helmet-async';
 
 const Index = () => {
+  const navigate = useNavigate();
   const {
     selectedAppliances,
     updateQuantity,
@@ -28,12 +29,16 @@ const Index = () => {
           name: a.name,
           wattage: a.wattage,
           quantity: a.quantity,
+          isHeavyDuty: a.isHeavyDuty,
+          soloOnly: a.soloOnly,
         })),
         calculations: {
           totalLoad: calculations.totalLoad,
           peakSurge: calculations.peakSurge,
           requiredKva: calculations.requiredKva,
           recommendedInverter: calculations.recommendedInverter,
+          warnings: calculations.warnings,
+          recommendations: calculations.recommendations,
         },
       };
       sessionStorage.setItem('inverterSizingData', JSON.stringify(sizingData));
@@ -47,11 +52,8 @@ const Index = () => {
     }));
   }, [selectedAppliances]);
 
-  const handleDownloadPDF = () => {
-    downloadPDF({
-      appliances: selectedAppliances,
-      calculations,
-    });
+  const handleViewDetails = () => {
+    navigate('/report');
   };
 
   return (
@@ -114,7 +116,7 @@ const Index = () => {
                   calculations={calculations}
                   activeCount={activeCount}
                   onReset={resetAll}
-                  onDownloadPDF={handleDownloadPDF}
+                  onViewDetails={handleViewDetails}
                 />
               </div>
             </div>

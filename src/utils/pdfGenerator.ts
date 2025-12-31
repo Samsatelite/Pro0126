@@ -183,7 +183,7 @@ export function generatePDFContent(data: PDFData): string {
     Calculations include a 20% safety margin, 50% surge diversity factor, and assume a power factor of 0.8.
   </div>
 
-  <div class="footer">InverterSize - Professional Power Planning Tool</div>
+  <div class="footer">InverterSize.com - Your Inverter Planning Tool</div>
 </body>
 </html>
   `;

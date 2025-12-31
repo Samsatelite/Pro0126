@@ -1,9 +1,9 @@
 import { memo } from 'react';
-import { Zap, Activity, AlertTriangle, Lightbulb, Download, RotateCcw } from 'lucide-react';
+import { Zap, Activity, AlertTriangle, Lightbulb, Eye, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatCard } from './StatCard';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface ResultsPanelProps {
@@ -17,14 +17,14 @@ interface ResultsPanelProps {
   };
   activeCount: number;
   onReset: () => void;
-  onDownloadPDF: () => void;
+  onViewDetails: () => void;
 }
 
 export const ResultsPanel = memo(function ResultsPanel({
   calculations,
   activeCount,
   onReset,
-  onDownloadPDF,
+  onViewDetails,
 }: ResultsPanelProps) {
   const hasResults = activeCount > 0;
 
@@ -123,11 +123,11 @@ export const ResultsPanel = memo(function ResultsPanel({
         </Button>
         <Button
           className="flex-1"
-          onClick={onDownloadPDF}
+          onClick={onViewDetails}
           disabled={!hasResults}
         >
-          <Download className="h-4 w-4 mr-2" />
-          Download PDF
+          <Eye className="h-4 w-4 mr-2" />
+          View Details
         </Button>
       </div>
 

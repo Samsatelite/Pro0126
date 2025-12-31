@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Helmet } from 'react-helmet-async';
-import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -46,6 +46,7 @@ const contactFormSchema = z.object({
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 const Contact = () => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const { toast } = useToast();
@@ -129,12 +130,34 @@ const Contact = () => {
       </Helmet>
 
       <div className="min-h-screen bg-background">
-        <Header />
+        {/* Header with back button */}
+        <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate('/')}
+                className="shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="font-display text-xl font-bold text-foreground">
+                  Contact an Expert
+                </h1>
+                <p className="text-xs text-muted-foreground">
+                  Get professional guidance
+                </p>
+              </div>
+            </div>
+          </div>
+        </header>
 
         <main className="container mx-auto px-4 py-8 max-w-2xl">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-2xl">Contact an Expert</CardTitle>
+              <CardTitle className="font-display text-2xl">Send us a message</CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
                 Get expert guidance, avoid costly mistakes, and install the right system the first time.
               </p>

@@ -70,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         from: "InverterSize <onboarding@resend.dev>",
-        to: ["devidfirm@gmail.com"],
+        to: ["samueldavid4star@gmail.com"],
         subject: `New Contact: ${data.name} - InverterSize`,
         html: emailHtml,
       }),

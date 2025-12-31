@@ -220,7 +220,7 @@ const Contact = () => {
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location (Optional)</FormLabel>
+                        <FormLabel>Location</FormLabel>
                         <FormControl>
                           <Input placeholder="City, State" {...field} />
                         </FormControl>

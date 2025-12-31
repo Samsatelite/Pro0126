@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Zap } from 'lucide-react';
+import { Zap, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logo from '@/assets/logo.svg';
 
@@ -23,9 +23,18 @@ export const Header = memo(function Header() {
             </div>
           </Link>
           
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            <span>Real-time calculations</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              <span>Real-time calculations</span>
+            </div>
+            <Link 
+              to="/auth" 
+              className="text-muted-foreground hover:text-foreground transition-colors p-2"
+              title="Admin"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </div>

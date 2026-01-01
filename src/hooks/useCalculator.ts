@@ -6,6 +6,7 @@ import {
   getCombinationWarnings,
   type ApplianceWithQuantity 
 } from '@/data/appliances';
+import type { CustomEquipment } from '@/components/CustomEquipmentInput';
 
 // Constants
 const POWER_FACTOR = 0.8;
@@ -34,6 +35,26 @@ export function useCalculator() {
   const [selectedAppliances, setSelectedAppliances] = useState<ApplianceWithQuantity[]>(
     appliances.map(a => ({ ...a, quantity: 0 }))
   );
+  
+  const [customEquipment, setCustomEquipment] = useState<CustomEquipment[]>([]);
+
+  const addCustomEquipment = useCallback((equipment: CustomEquipment) => {
+    setCustomEquipment(prev => [...prev, equipment]);
+  }, []);
+
+  const removeCustomEquipment = useCallback((id: string) => {
+    setCustomEquipment(prev => prev.filter(eq => eq.id !== id));
+  }, []);
+
+  const updateCustomEquipmentQuantity = useCallback((id: string, quantity: number) => {
+    if (quantity <= 0) {
+      setCustomEquipment(prev => prev.filter(eq => eq.id !== id));
+    } else {
+      setCustomEquipment(prev => 
+        prev.map(eq => eq.id === id ? { ...eq, quantity } : eq)
+      );
+    }
+  }, []);
 
   const updateQuantity = useCallback((id: string, quantity: number) => {
     setSelectedAppliances(prev => {
@@ -94,16 +115,23 @@ export function useCalculator() {
 
   const resetAll = useCallback(() => {
     setSelectedAppliances(appliances.map(a => ({ ...a, quantity: 0 })));
+    setCustomEquipment([]);
   }, []);
 
   const calculations = useMemo((): CalculationResult => {
     const activeAppliances = selectedAppliances.filter(a => a.quantity > 0);
+    
+    // Calculate custom equipment load
+    const customLoad = customEquipment.reduce(
+      (sum, eq) => sum + eq.wattage * eq.quantity,
+      0
+    );
 
-    // 1. Total running load = Σ (wattage × quantity)
+    // 1. Total running load = Σ (wattage × quantity) + custom equipment
     const totalLoad = activeAppliances.reduce(
       (sum, a) => sum + a.wattage * a.quantity,
       0
-    );
+    ) + customLoad;
 
     // 2. Calculate effective surge per appliance (only those with surge > 1)
     const surgeCandidates = activeAppliances
@@ -164,6 +192,11 @@ export function useCalculator() {
       warnings.push(`${soloAppliance.name} should be used alone for optimal performance.`);
     }
 
+    // Custom equipment warning
+    if (customEquipment.length > 0) {
+      warnings.push('Custom equipment wattage values are estimates. Verify with manufacturer specs.');
+    }
+
     // 8. Generate recommendations
     const recommendations: string[] = [];
 
@@ -192,11 +225,11 @@ export function useCalculator() {
       recommendations,
       selectedHeavyDuty,
     };
-  }, [selectedAppliances]);
+  }, [selectedAppliances, customEquipment]);
 
   const activeCount = useMemo(
-    () => selectedAppliances.filter(a => a.quantity > 0).length,
-    [selectedAppliances]
+    () => selectedAppliances.filter(a => a.quantity > 0).length + customEquipment.length,
+    [selectedAppliances, customEquipment]
   );
 
   const hasHeavyDutySelected = useMemo(
@@ -217,7 +250,11 @@ export function useCalculator() {
 
   return {
     selectedAppliances,
+    customEquipment,
     updateQuantity,
+    addCustomEquipment,
+    removeCustomEquipment,
+    updateCustomEquipmentQuantity,
     resetAll,
     calculations,
     activeCount,

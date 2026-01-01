@@ -75,6 +75,7 @@ export const appliances: Appliance[] = [
   // Office (under 500W)
   { id: 'laptop', name: 'Laptop', wattage: 65, surge: 1, category: 'office', icon: 'Laptop', isHeavyDuty: false, soloOnly: false },
   { id: 'desktop', name: 'Desktop Computer', wattage: 250, surge: 1.5, category: 'office', icon: 'Monitor', isHeavyDuty: false, soloOnly: false },
+  { id: 'monitor', name: 'Computer Monitor', wattage: 40, surge: 1, category: 'office', icon: 'Monitor', isHeavyDuty: false, soloOnly: false },
   { id: 'printer', name: 'Printer', wattage: 150, surge: 2, category: 'office', icon: 'Printer', isHeavyDuty: false, soloOnly: false },
   { id: 'router', name: 'WiFi Router', wattage: 15, surge: 1, category: 'office', icon: 'Wifi', isHeavyDuty: false, soloOnly: false },
   { id: 'phone_charger', name: 'Phone Charger', wattage: 10, surge: 1, category: 'office', icon: 'Smartphone', isHeavyDuty: false, soloOnly: false },

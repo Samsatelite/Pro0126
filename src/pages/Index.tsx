@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { CategorySection } from '@/components/CategorySection';
 import { ResultsPanel } from '@/components/ResultsPanel';
+import { CustomEquipmentInput } from '@/components/CustomEquipmentInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCalculator } from '@/hooks/useCalculator';
 import { applianceCategories } from '@/data/appliances';
@@ -12,7 +13,11 @@ const Index = () => {
   const navigate = useNavigate();
   const {
     selectedAppliances,
+    customEquipment,
     updateQuantity,
+    addCustomEquipment,
+    removeCustomEquipment,
+    updateCustomEquipmentQuantity,
     resetAll,
     calculations,
     activeCount,
@@ -25,13 +30,22 @@ const Index = () => {
   useEffect(() => {
     if (activeCount > 0) {
       const sizingData = {
-        appliances: selectedAppliances.filter(a => a.quantity > 0).map(a => ({
-          name: a.name,
-          wattage: a.wattage,
-          quantity: a.quantity,
-          isHeavyDuty: a.isHeavyDuty,
-          soloOnly: a.soloOnly,
-        })),
+        appliances: [
+          ...selectedAppliances.filter(a => a.quantity > 0).map(a => ({
+            name: a.name,
+            wattage: a.wattage,
+            quantity: a.quantity,
+            isHeavyDuty: a.isHeavyDuty,
+            soloOnly: a.soloOnly,
+          })),
+          ...customEquipment.map(eq => ({
+            name: `${eq.name} (Custom)`,
+            wattage: eq.wattage,
+            quantity: eq.quantity,
+            isHeavyDuty: false,
+            soloOnly: false,
+          })),
+        ],
         calculations: {
           totalLoad: calculations.totalLoad,
           peakSurge: calculations.peakSurge,
@@ -43,7 +57,7 @@ const Index = () => {
       };
       sessionStorage.setItem('inverterSizingData', JSON.stringify(sizingData));
     }
-  }, [selectedAppliances, calculations, activeCount]);
+  }, [selectedAppliances, customEquipment, calculations, activeCount]);
 
   const appliancesByCategory = useMemo(() => {
     return applianceCategories.map(cat => ({
@@ -102,6 +116,16 @@ const Index = () => {
                       selectedHeavyDutyIds={selectedHeavyDutyIds}
                     />
                   ))}
+                  
+                  {/* Custom Equipment Section */}
+                  <div className="border border-dashed border-border rounded-xl p-4">
+                    <CustomEquipmentInput
+                      customEquipment={customEquipment}
+                      onAdd={addCustomEquipment}
+                      onRemove={removeCustomEquipment}
+                      onUpdateQuantity={updateCustomEquipmentQuantity}
+                    />
+                  </div>
                 </div>
               </ScrollArea>
             </div>

@@ -25,6 +25,9 @@ const contactFormSchema = z.object({
   contactMethod: z.enum(['whatsapp', 'email'], {
     required_error: 'Please select how you would like to be contacted',
   }),
+  customerType: z.enum(['home', 'business']),
+  businessDescription: z.string().optional(),
+  majorAppliances: z.string().optional(),
 }).refine((data) => {
   if (data.contactMethod === 'whatsapp') {
     return data.phone && data.phone.length >= 10;
@@ -60,8 +63,13 @@ const Contact = () => {
       location: '',
       message: '',
       contactMethod: undefined,
+      customerType: 'home',
+      businessDescription: '',
+      majorAppliances: '',
     },
   });
+
+  const customerType = form.watch('customerType');
 
   const contactMethod = form.watch('contactMethod');
 
@@ -186,6 +194,33 @@ const Contact = () => {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
                     control={form.control}
+                    name="customerType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>I am a *</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex gap-6"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="home" id="home" />
+                              <Label htmlFor="home" className="cursor-pointer">Home User</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="business" id="business" />
+                              <Label htmlFor="business" className="cursor-pointer">Business</Label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
@@ -197,6 +232,44 @@ const Contact = () => {
                       </FormItem>
                     )}
                   />
+
+                  {customerType === 'business' && (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="businessDescription"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Describe your business</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="What type of business do you run?"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="majorAppliances"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Major appliances used by business</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="List the major appliances your business uses (e.g., industrial freezers, air conditioners, computers...)"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
 
                   <FormField
                     control={form.control}

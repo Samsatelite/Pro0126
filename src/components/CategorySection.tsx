@@ -6,11 +6,14 @@ import {
   Fan, 
   Monitor, 
   Zap,
+  AirVent,
+  Refrigerator,
   type LucideIcon 
 } from 'lucide-react';
 import { ApplianceCard } from './ApplianceCard';
-import type { ApplianceWithQuantity } from '@/data/appliances';
-import { applianceCategories, allowedCombinations } from '@/data/appliances';
+import { ApplianceVariantCard, type VariantSelection } from './ApplianceVariantCard';
+import type { ApplianceWithQuantity, ApplianceVariant } from '@/data/appliances';
+import { applianceCategories, allowedCombinations, applianceVariants, soloOnlyVariants } from '@/data/appliances';
 
 const iconMap: Record<string, LucideIcon> = {
   Lightbulb,
@@ -19,6 +22,8 @@ const iconMap: Record<string, LucideIcon> = {
   Fan,
   Monitor,
   Zap,
+  AirVent,
+  Refrigerator,
 };
 
 // Check if an appliance can be combined with currently selected ones
@@ -72,6 +77,9 @@ interface CategorySectionProps {
   categoryId: string;
   appliances: ApplianceWithQuantity[];
   onUpdateQuantity: (id: string, quantity: number) => void;
+  variantSelections?: Record<string, VariantSelection[]>;
+  onUpdateVariantSelection?: (applianceId: string, variantId: string, quantity: number) => void;
+  onDisabledApplianceClick?: (appliance: ApplianceWithQuantity) => void;
   hasHeavyDutySelected?: boolean;
   hasSoloOnlySelected?: boolean;
   selectedHeavyDutyIds?: string[];
@@ -81,6 +89,9 @@ export const CategorySection = memo(function CategorySection({
   categoryId,
   appliances,
   onUpdateQuantity,
+  variantSelections = {},
+  onUpdateVariantSelection,
+  onDisabledApplianceClick,
   hasSoloOnlySelected = false,
   selectedHeavyDutyIds = [],
 }: CategorySectionProps) {
@@ -90,6 +101,14 @@ export const CategorySection = memo(function CategorySection({
   const IconComponent = iconMap[category.icon] || Zap;
   const activeCount = appliances.filter(a => a.quantity > 0).length;
   const isHeavyDutyCategory = categoryId === 'heavy-duty';
+
+  const handleVariantSelection = (applianceId: string, variantId: string, quantity: number) => {
+    // Check if selecting a solo-only variant (like 2HP AC)
+    if (soloOnlyVariants.includes(variantId) && quantity > 0 && selectedHeavyDutyIds.length > 0) {
+      // This will be handled by the parent with a dialog
+    }
+    onUpdateVariantSelection?.(applianceId, variantId, quantity);
+  };
 
   return (
     <div className="animate-slide-up" style={{ animationDelay: `${applianceCategories.indexOf(category) * 50}ms` }}>
@@ -124,14 +143,45 @@ export const CategorySection = memo(function CategorySection({
             hasSoloOnlySelected
           );
           
+          // Handle appliances with variants
+          if (appliance.hasVariants && applianceVariants[appliance.id]) {
+            const variants = applianceVariants[appliance.id];
+            const selections = variantSelections[appliance.id] || [];
+            const ApplianceIcon = iconMap[appliance.icon];
+            
+            return (
+              <ApplianceVariantCard
+                key={appliance.id}
+                name={appliance.name}
+                icon={ApplianceIcon ? <ApplianceIcon className="h-4 w-4 text-muted-foreground" /> : null}
+                variants={variants}
+                selections={selections}
+                onUpdateSelection={(variantId, quantity) => handleVariantSelection(appliance.id, variantId, quantity)}
+                isHeavyDuty={appliance.isHeavyDuty}
+                soloOnly={appliance.soloOnly}
+                allowMultiple={appliance.allowMultiple !== false}
+                isDisabled={!canSelect}
+                disabledReason={reason}
+              />
+            );
+          }
+          
           return (
-            <ApplianceCard
+            <div 
               key={appliance.id}
-              appliance={appliance}
-              onUpdateQuantity={onUpdateQuantity}
-              isDisabled={!canSelect}
-              disabledReason={reason}
-            />
+              onClick={() => {
+                if (!canSelect && onDisabledApplianceClick) {
+                  onDisabledApplianceClick(appliance);
+                }
+              }}
+            >
+              <ApplianceCard
+                appliance={appliance}
+                onUpdateQuantity={onUpdateQuantity}
+                isDisabled={!canSelect}
+                disabledReason={reason}
+              />
+            </div>
           );
         })}
       </div>

@@ -4,7 +4,12 @@ import {
   inverterSizes, 
   allowedCombinations, 
   getCombinationWarnings,
-  type ApplianceWithQuantity 
+  applianceVariants,
+  soloOnlyVariants,
+  essentialApplianceIds,
+  fanApplianceIds,
+  type ApplianceWithQuantity,
+  type ApplianceVariant,
 } from '@/data/appliances';
 import type { CustomEquipment } from '@/components/CustomEquipmentInput';
 
@@ -12,6 +17,11 @@ import type { CustomEquipment } from '@/components/CustomEquipmentInput';
 const POWER_FACTOR = 0.8;
 const SAFETY_MARGIN = 1.2; // 20% safety margin
 const SURGE_DIVERSITY = 0.5; // Only 50% of max surge applied
+
+export interface VariantSelection {
+  variantId: string;
+  quantity: number;
+}
 
 interface CalculationResult {
   totalLoad: number;
@@ -36,6 +46,7 @@ export function useCalculator() {
     appliances.map(a => ({ ...a, quantity: 0 }))
   );
   
+  const [variantSelections, setVariantSelections] = useState<Record<string, VariantSelection[]>>({});
   const [customEquipment, setCustomEquipment] = useState<CustomEquipment[]>([]);
 
   const addCustomEquipment = useCallback((equipment: CustomEquipment) => {
@@ -56,6 +67,41 @@ export function useCalculator() {
     }
   }, []);
 
+  const updateVariantSelection = useCallback((applianceId: string, variantId: string, quantity: number) => {
+    setVariantSelections(prev => {
+      const current = prev[applianceId] || [];
+      const existing = current.find(s => s.variantId === variantId);
+      
+      let updated: VariantSelection[];
+      if (quantity <= 0) {
+        updated = current.filter(s => s.variantId !== variantId);
+      } else if (existing) {
+        updated = current.map(s => s.variantId === variantId ? { ...s, quantity } : s);
+      } else {
+        updated = [...current, { variantId, quantity }];
+      }
+      
+      return { ...prev, [applianceId]: updated };
+    });
+    
+    // Update parent appliance quantity based on total variant selections
+    setSelectedAppliances(prev => {
+      return prev.map(a => {
+        if (a.id === applianceId) {
+          const selections = variantSelections[applianceId] || [];
+          // Account for the new change
+          const existingTotal = selections.reduce((sum, s) => {
+            if (s.variantId === variantId) return sum;
+            return sum + s.quantity;
+          }, 0);
+          const newTotal = existingTotal + (quantity > 0 ? quantity : 0);
+          return { ...a, quantity: newTotal > 0 ? 1 : 0 };
+        }
+        return a;
+      });
+    });
+  }, [variantSelections]);
+
   const updateQuantity = useCallback((id: string, quantity: number) => {
     setSelectedAppliances(prev => {
       const appliance = prev.find(a => a.id === id);
@@ -63,11 +109,26 @@ export function useCalculator() {
       
       // If deselecting, just update
       if (quantity === 0) {
+        // Also clear variant selections if applicable
+        if (appliance.hasVariants) {
+          setVariantSelections(p => ({ ...p, [id]: [] }));
+        }
         return prev.map(a => (a.id === id ? { ...a, quantity: 0 } : a));
       }
       
       // If this is a solo-only appliance, reset all other heavy-duty
       if (appliance.soloOnly && quantity > 0) {
+        // Clear variant selections for heavy-duty
+        setVariantSelections(p => {
+          const updated = { ...p };
+          prev.forEach(a => {
+            if (a.isHeavyDuty && a.hasVariants) {
+              updated[a.id] = [];
+            }
+          });
+          return updated;
+        });
+        
         return prev.map(a => {
           if (a.id === id) return { ...a, quantity: 1 };
           if (a.isHeavyDuty) return { ...a, quantity: 0 };
@@ -82,6 +143,17 @@ export function useCalculator() {
         // If there's a solo-only appliance currently selected, reset it
         const hasSoloSelected = currentHeavyDuty.some(a => a.soloOnly);
         if (hasSoloSelected) {
+          // Clear variant selections for heavy-duty
+          setVariantSelections(p => {
+            const updated = { ...p };
+            prev.forEach(a => {
+              if (a.isHeavyDuty && a.hasVariants) {
+                updated[a.id] = [];
+              }
+            });
+            return updated;
+          });
+          
           return prev.map(a => {
             if (a.id === id) return { ...a, quantity: 1 };
             if (a.isHeavyDuty) return { ...a, quantity: 0 };
@@ -91,12 +163,21 @@ export function useCalculator() {
         
         // Check if this new selection is compatible with existing heavy-duty
         if (currentHeavyDuty.length > 0) {
-          // Allow max 2 heavy-duty appliances that are in allowed combinations
           const canAddMore = currentHeavyDuty.length < 2 && 
             currentHeavyDuty.every(existing => isAllowedCombination(existing.id, id));
           
           if (!canAddMore) {
             // Replace existing heavy-duty selections with this one
+            setVariantSelections(p => {
+              const updated = { ...p };
+              prev.forEach(a => {
+                if (a.isHeavyDuty && a.hasVariants && a.id !== id) {
+                  updated[a.id] = [];
+                }
+              });
+              return updated;
+            });
+            
             return prev.map(a => {
               if (a.id === id) return { ...a, quantity: 1 };
               if (a.isHeavyDuty) return { ...a, quantity: 0 };
@@ -113,10 +194,69 @@ export function useCalculator() {
     });
   }, []);
 
+  // Turn off non-essential appliances (keep lights, phone charger, fan, laptop, wifi)
+  const turnOffNonEssentials = useCallback(() => {
+    setSelectedAppliances(prev => {
+      return prev.map(a => {
+        if (essentialApplianceIds.includes(a.id)) {
+          return a; // Keep essentials as-is
+        }
+        return { ...a, quantity: 0 };
+      });
+    });
+    
+    // Clear variant selections except for LED bulb
+    setVariantSelections(prev => {
+      const updated: Record<string, VariantSelection[]> = {};
+      Object.keys(prev).forEach(key => {
+        if (key === 'led_bulb') {
+          updated[key] = prev[key];
+        } else {
+          updated[key] = [];
+        }
+      });
+      return updated;
+    });
+  }, []);
+
+  // Turn off fans only
+  const turnOffFans = useCallback(() => {
+    setSelectedAppliances(prev => {
+      return prev.map(a => {
+        if (fanApplianceIds.includes(a.id)) {
+          return { ...a, quantity: 0 };
+        }
+        return a;
+      });
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setSelectedAppliances(appliances.map(a => ({ ...a, quantity: 0 })));
+    setVariantSelections({});
     setCustomEquipment([]);
   }, []);
+
+  // Check if fans are selected
+  const hasFansSelected = useMemo(() => {
+    return selectedAppliances.some(a => fanApplianceIds.includes(a.id) && a.quantity > 0);
+  }, [selectedAppliances]);
+
+  // Get selected heavy duty variant IDs
+  const selectedHeavyDutyVariantIds = useMemo(() => {
+    const ids: string[] = [];
+    Object.entries(variantSelections).forEach(([applianceId, selections]) => {
+      const appliance = appliances.find(a => a.id === applianceId);
+      if (appliance?.isHeavyDuty) {
+        selections.forEach(s => {
+          if (s.quantity > 0) {
+            ids.push(s.variantId);
+          }
+        });
+      }
+    });
+    return ids;
+  }, [variantSelections]);
 
   const calculations = useMemo((): CalculationResult => {
     const activeAppliances = selectedAppliances.filter(a => a.quantity > 0);
@@ -127,45 +267,67 @@ export function useCalculator() {
       0
     );
 
-    // 1. Total running load = Σ (wattage × quantity) + custom equipment
-    const totalLoad = activeAppliances.reduce(
+    // Calculate load from appliances with variants
+    let variantLoad = 0;
+    let variantSurgeCandidates: number[] = [];
+    
+    Object.entries(variantSelections).forEach(([applianceId, selections]) => {
+      const variants = applianceVariants[applianceId];
+      if (variants) {
+        selections.forEach(sel => {
+          const variant = variants.find(v => v.id === sel.variantId);
+          if (variant && sel.quantity > 0) {
+            variantLoad += variant.wattage * sel.quantity;
+            if (variant.surge > 1) {
+              variantSurgeCandidates.push(variant.wattage * (variant.surge - 1));
+            }
+          }
+        });
+      }
+    });
+
+    // Calculate load from non-variant appliances
+    const nonVariantAppliances = activeAppliances.filter(a => !a.hasVariants);
+    const nonVariantLoad = nonVariantAppliances.reduce(
       (sum, a) => sum + a.wattage * a.quantity,
       0
-    ) + customLoad;
+    );
 
-    // 2. Calculate effective surge per appliance (only those with surge > 1)
-    const surgeCandidates = activeAppliances
+    // Total load
+    const totalLoad = nonVariantLoad + variantLoad + customLoad;
+
+    // Calculate surge
+    const nonVariantSurgeCandidates = nonVariantAppliances
       .filter(a => a.surge > 1 && a.quantity > 0)
       .map(a => a.wattage * (a.surge - 1));
 
-    const maxSurge = surgeCandidates.length > 0 
-      ? Math.max(...surgeCandidates) 
+    const allSurgeCandidates = [...nonVariantSurgeCandidates, ...variantSurgeCandidates];
+    const maxSurge = allSurgeCandidates.length > 0 
+      ? Math.max(...allSurgeCandidates) 
       : 0;
 
-    // 3. Apply diversity factor
     const adjustedSurge = maxSurge * SURGE_DIVERSITY;
-
-    // 4. Required inverter power (Watts)
     const rawRequiredPower = totalLoad + adjustedSurge;
     const finalRequiredPower = rawRequiredPower * SAFETY_MARGIN;
-
-    // 5. Convert to kVA (divide by 1000 * power factor = 800)
     const requiredKva = finalRequiredPower / (1000 * POWER_FACTOR);
 
-    // 6. Map to standard inverter sizes
     const recommendedInverter = inverterSizes.find(size => size >= requiredKva) 
       || inverterSizes[inverterSizes.length - 1];
 
     // Get selected heavy duty appliances
     const selectedHeavyDuty = activeAppliances.filter(a => a.isHeavyDuty);
-    const selectedHeavyDutyIds = selectedHeavyDuty.map(a => a.id);
+    const selectedHeavyDutyIds = [
+      ...selectedHeavyDuty.filter(a => !a.hasVariants).map(a => a.id),
+      ...selectedHeavyDutyVariantIds,
+    ];
 
-    // 7. Generate warnings
+    // Generate warnings
     const warnings: string[] = [];
 
-    // Check for specific appliance combinations
-    const hasAC = activeAppliances.some(a => a.id.includes('ac') && a.quantity > 0);
-    const hasFridge = activeAppliances.some(a => a.id === 'refrigerator' && a.quantity > 0);
+    const hasAC = selectedHeavyDutyVariantIds.some(id => id.startsWith('ac_'));
+    const hasFridge = selectedHeavyDutyVariantIds.some(id => 
+      ['mini_fridge', 'top_bottom_freezer', 'deep_freezer'].includes(id)
+    );
     const hasHeating = activeAppliances.some(a => 
       ['microwave', 'toaster'].includes(a.id) && a.quantity > 0
     );
@@ -182,28 +344,34 @@ export function useCalculator() {
       warnings.push('High motor startup load detected. Consider a higher inverter capacity.');
     }
 
-    // Add combination-specific warnings
     const combinationWarnings = getCombinationWarnings(selectedHeavyDutyIds);
     warnings.push(...combinationWarnings);
 
-    // Solo-only appliance warnings
     const soloAppliance = selectedHeavyDuty.find(a => a.soloOnly);
     if (soloAppliance) {
       warnings.push(`${soloAppliance.name} should be used alone for optimal performance.`);
     }
 
-    // Custom equipment warning
+    // Check for solo-only variants (2HP AC)
+    const soloVariant = selectedHeavyDutyVariantIds.find(id => soloOnlyVariants.includes(id));
+    if (soloVariant) {
+      const variant = Object.values(applianceVariants).flat().find(v => v.id === soloVariant);
+      if (variant) {
+        warnings.push(`${variant.label} Air Conditioner should be used alone for optimal performance.`);
+      }
+    }
+
     if (customEquipment.length > 0) {
       warnings.push('Custom equipment wattage values are estimates. Verify with manufacturer specs.');
     }
 
-    // 8. Generate recommendations
+    // Recommendations
     const recommendations: string[] = [];
 
     if (totalLoad > 0) {
       recommendations.push(`Recommended inverter: ${recommendedInverter} kVA for optimal performance`);
 
-      const highSurgeAppliance = activeAppliances.find(a => a.surge >= 3);
+      const highSurgeAppliance = nonVariantAppliances.find(a => a.surge >= 3);
       if (highSurgeAppliance) {
         recommendations.push(
           `${highSurgeAppliance.name} has high startup surge. Ensure inverter can handle ${((highSurgeAppliance.wattage * highSurgeAppliance.surge) / 1000).toFixed(1)} kW peak.`
@@ -225,41 +393,71 @@ export function useCalculator() {
       recommendations,
       selectedHeavyDuty,
     };
-  }, [selectedAppliances, customEquipment]);
+  }, [selectedAppliances, variantSelections, customEquipment, selectedHeavyDutyVariantIds]);
 
-  const activeCount = useMemo(
-    () => selectedAppliances.filter(a => a.quantity > 0).length + customEquipment.length,
-    [selectedAppliances, customEquipment]
-  );
+  const activeCount = useMemo(() => {
+    const applianceCount = selectedAppliances.filter(a => a.quantity > 0).length;
+    const variantCount = Object.values(variantSelections).reduce((sum, selections) => {
+      return sum + selections.filter(s => s.quantity > 0).length;
+    }, 0);
+    return applianceCount + variantCount + customEquipment.length;
+  }, [selectedAppliances, variantSelections, customEquipment]);
 
   const hasHeavyDutySelected = useMemo(
     () => selectedAppliances.some(a => a.isHeavyDuty && a.quantity > 0),
     [selectedAppliances]
   );
 
-  const hasSoloOnlySelected = useMemo(
-    () => selectedAppliances.some(a => a.soloOnly && a.quantity > 0),
-    [selectedAppliances]
-  );
+  const hasSoloOnlySelected = useMemo(() => {
+    const hasSoloAppliance = selectedAppliances.some(a => a.soloOnly && a.quantity > 0);
+    const hasSoloVariant = selectedHeavyDutyVariantIds.some(id => soloOnlyVariants.includes(id));
+    return hasSoloAppliance || hasSoloVariant;
+  }, [selectedAppliances, selectedHeavyDutyVariantIds]);
 
-  // Get IDs of currently selected heavy-duty for compatibility checks
-  const selectedHeavyDutyIds = useMemo(
-    () => selectedAppliances.filter(a => a.isHeavyDuty && a.quantity > 0).map(a => a.id),
-    [selectedAppliances]
-  );
+  const selectedHeavyDutyIds = useMemo(() => {
+    const applianceIds = selectedAppliances
+      .filter(a => a.isHeavyDuty && a.quantity > 0 && !a.hasVariants)
+      .map(a => a.id);
+    return [...applianceIds, ...selectedHeavyDutyVariantIds];
+  }, [selectedAppliances, selectedHeavyDutyVariantIds]);
+
+  // Get names of selected heavy-duty appliances/variants
+  const selectedHeavyDutyNames = useMemo(() => {
+    const names: string[] = [];
+    
+    selectedAppliances
+      .filter(a => a.isHeavyDuty && a.quantity > 0 && !a.hasVariants)
+      .forEach(a => names.push(a.name));
+    
+    selectedHeavyDutyVariantIds.forEach(variantId => {
+      const variant = Object.values(applianceVariants).flat().find(v => v.id === variantId);
+      if (variant) {
+        const parent = appliances.find(a => a.id === variant.parentId);
+        names.push(`${parent?.name || ''} ${variant.label}`.trim());
+      }
+    });
+    
+    return names;
+  }, [selectedAppliances, selectedHeavyDutyVariantIds]);
 
   return {
     selectedAppliances,
+    variantSelections,
     customEquipment,
     updateQuantity,
+    updateVariantSelection,
     addCustomEquipment,
     removeCustomEquipment,
     updateCustomEquipmentQuantity,
+    turnOffNonEssentials,
+    turnOffFans,
     resetAll,
     calculations,
     activeCount,
     hasHeavyDutySelected,
     hasSoloOnlySelected,
+    hasFansSelected,
     selectedHeavyDutyIds,
+    selectedHeavyDutyNames,
   };
 }

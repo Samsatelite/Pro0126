@@ -147,6 +147,21 @@ export const ApplianceVariantCard = memo(function ApplianceVariantCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 bg-popover z-50">
+            {!allowMultiple && isActive && (
+              <DropdownMenuItem
+                className="flex items-center justify-between py-3 focus:bg-accent text-destructive"
+                onClick={() => {
+                  // Clear all selections for this appliance
+                  selections.forEach(s => {
+                    if (s.quantity > 0) {
+                      onUpdateSelection(s.variantId, 0);
+                    }
+                  });
+                }}
+              >
+                <span className="font-medium">Remove Selection</span>
+              </DropdownMenuItem>
+            )}
             {variants.map(variant => {
               const selection = selections.find(s => s.variantId === variant.id);
               const qty = selection?.quantity || 0;

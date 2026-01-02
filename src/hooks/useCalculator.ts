@@ -231,6 +231,13 @@ export function useCalculator() {
     });
   }, []);
 
+  // Force add an appliance without resetting others (for "Use it" confirmation)
+  const forceAddAppliance = useCallback((id: string) => {
+    setSelectedAppliances(prev => {
+      return prev.map(a => (a.id === id ? { ...a, quantity: 1 } : a));
+    });
+  }, []);
+
   const resetAll = useCallback(() => {
     setSelectedAppliances(appliances.map(a => ({ ...a, quantity: 0 })));
     setVariantSelections({});
@@ -451,6 +458,7 @@ export function useCalculator() {
     updateCustomEquipmentQuantity,
     turnOffNonEssentials,
     turnOffFans,
+    forceAddAppliance,
     resetAll,
     calculations,
     activeCount,

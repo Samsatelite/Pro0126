@@ -24,6 +24,7 @@ const Index = () => {
     updateCustomEquipmentQuantity,
     turnOffNonEssentials,
     turnOffFans,
+    forceAddAppliance,
     resetAll,
     calculations,
     activeCount,
@@ -119,13 +120,13 @@ const Index = () => {
     } else if (dialogType === 'ac-fan-conflict') {
       turnOffFans();
     } else if (dialogType === 'disabled-appliance' && pendingAppliance) {
-      // Force enable the appliance by resetting other heavy-duty and selecting this one
-      updateQuantity(pendingAppliance.id, 1);
+      // Force enable the appliance WITHOUT resetting others
+      forceAddAppliance(pendingAppliance.id);
     }
     setDialogOpen(false);
     setDialogType(null);
     setPendingAppliance(null);
-  }, [dialogType, pendingAppliance, turnOffNonEssentials, turnOffFans, updateQuantity]);
+  }, [dialogType, pendingAppliance, turnOffNonEssentials, turnOffFans, forceAddAppliance]);
 
   const handleDialogCancel = useCallback(() => {
     setDialogOpen(false);

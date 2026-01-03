@@ -132,7 +132,7 @@ export const ResultsPanel = memo(function ResultsPanel({
       </div>
 
       {/* Expert CTA */}
-      <Card className="border-primary/20 bg-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
+      <Card className="border-primary/20 bg-secondary/30 animate-slide-up" style={{ animationDelay: '300ms' }}>
         <CardContent className="pt-4 space-y-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">

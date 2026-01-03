@@ -135,11 +135,8 @@ export const ResultsPanel = memo(function ResultsPanel({
       <Card className="border-primary/20 bg-primary/5 animate-slide-up" style={{ animationDelay: '300ms' }}>
         <CardContent className="pt-4 space-y-4">
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              If you plan to run very heavy equipment, or devices not listed in this calculator, please consult a qualified inverter engineer.
-            </p>
             <p className="text-sm font-medium text-foreground">
-              Get expert guidance, avoid costly mistakes, and install the right system the first time.
+              If you plan to use very heavy equipment or power a business, consult a qualified inverter engineer to choose the correct inverter size.
             </p>
           </div>
           <Link 

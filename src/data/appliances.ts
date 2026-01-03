@@ -28,6 +28,8 @@ export interface ApplianceWithQuantity extends Appliance {
 export const allowedCombinations: [string, string][] = [
   // Parent-level combinations (AC and Refrigerator are compatible)
   ['air_conditioner', 'refrigerator'],
+  // Parent-level combinations (AC and Refrigerator are compatible)
+  ['refrigerator', 'air_conditioner'],
   // Specific variant combinations
   ['ac_1hp', 'refrigerator'],
   ['ac_1hp', 'mini_fridge'],

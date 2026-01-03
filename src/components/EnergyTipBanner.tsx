@@ -7,8 +7,8 @@ export function EnergyTipBanner() {
         Important Tips
       </AlertTitle>
       <AlertDescription className="text-muted-foreground mt-2 space-y-1">
-        <p>1. For best inverter performance, use energy-saving appliances whenever possible.</p>
-        <p>2. Avoid running multiple heavy-duty devices at the same time, as this significantly increases the inverter capacity required.</p>
+        <p>1. Use only energy-saving appliances to get the best performance.</p>
+        <p>2. Avoid running multiple heavy-duty devices at the same time, switch off one for the other.</p>
       </AlertDescription>
     </Alert>
   );

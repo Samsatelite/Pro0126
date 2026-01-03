@@ -24,7 +24,11 @@ export interface ApplianceWithQuantity extends Appliance {
 }
 
 // Allowed heavy-duty combinations (pairs that can work together)
+// Note: 'air_conditioner' and 'refrigerator' are parent IDs that allow all their variants to combine
 export const allowedCombinations: [string, string][] = [
+  // Parent-level combinations (AC and Refrigerator are compatible)
+  ['air_conditioner', 'refrigerator'],
+  // Specific variant combinations
   ['ac_1hp', 'refrigerator'],
   ['ac_1hp', 'mini_fridge'],
   ['ac_1hp', 'top_bottom_freezer'],
@@ -37,6 +41,8 @@ export const allowedCombinations: [string, string][] = [
   ['ac_15hp', 'mini_fridge'],
   ['ac_15hp_inv', 'refrigerator'],
   ['ac_15hp_inv', 'mini_fridge'],
+  ['ac_2hp', 'mini_fridge'],
+  ['ac_2hp_inv', 'mini_fridge'],
   ['refrigerator', 'deep_freezer'],
   ['mini_fridge', 'deep_freezer'],
   ['top_bottom_freezer', 'mini_fridge'],

@@ -108,7 +108,16 @@ export const CategorySection = memo(function CategorySection({
   if (!category) return null;
 
   const IconComponent = iconMap[category.icon] || Zap;
-  const activeCount = appliances.filter(a => a.quantity > 0).length;
+  
+  // Count active appliances - for variant appliances, check if any variant is selected
+  const activeCount = appliances.filter(a => {
+    if (a.hasVariants && applianceVariants[a.id]) {
+      const selections = variantSelections[a.id] || [];
+      return selections.some(s => s.quantity > 0);
+    }
+    return a.quantity > 0;
+  }).length;
+  
   const isHeavyDutyCategory = categoryId === 'heavy-duty';
 
   // Handle turning off non-essentials when toggle is switched OFF

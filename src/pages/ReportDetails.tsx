@@ -317,7 +317,7 @@ const ReportDetails = () => {
             <div className="text-center pt-4 pb-8 space-y-4">
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">
-                  If you plan to operate very heavy equipment or power your business, consult a qualified inverter engineer to determine the correct inverter system size.
+                  If you plan to use very heavy equipment or power a business, consult a qualified inverter engineer to choose the correct inverter size.
                 </p>
                 <Link 
                   to="/contact" 

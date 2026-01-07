@@ -32,8 +32,8 @@ export const CATEGORY_SURGE: Record<EquipmentCategory, number> = {
 
 const categoryLabels: Record<EquipmentCategory, string> = {
   none: 'None',
-  has_motor: 'Has Motor',
-  produce_heat: 'Produce Heat',
+  has_motor: 'Has a motor',
+  produce_heat: 'Produces heat',
 };
 
 interface CustomEquipmentInputProps {
@@ -131,9 +131,9 @@ export const CustomEquipmentInput = memo(function CustomEquipmentInput({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None (no surge)</SelectItem>
-                <SelectItem value="has_motor">Has Motor (3x surge)</SelectItem>
-                <SelectItem value="produce_heat">Produce Heat (1.5x surge)</SelectItem>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="has_motor">Has a motor</SelectItem>
+                <SelectItem value="produce_heat">Produces heat</SelectItem>
               </SelectContent>
             </Select>
           </div>

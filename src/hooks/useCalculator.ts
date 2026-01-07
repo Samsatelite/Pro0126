@@ -409,11 +409,19 @@ export function useCalculator() {
   }, [selectedAppliances, variantSelections, customEquipment, selectedHeavyDutyVariantIds]);
 
   const activeCount = useMemo(() => {
-    const applianceCount = selectedAppliances.filter(a => a.quantity > 0).length;
-    const variantCount = Object.values(variantSelections).reduce((sum, selections) => {
-      return sum + selections.filter(s => s.quantity > 0).length;
+    // Count how many distinct "things" are selected:
+    // - Non-variant appliances: count if quantity > 0
+    // - Variant appliances (e.g. AC/Fridge/LED Bulb/LED TV): count 1 if any variant is selected
+    // - Custom equipment: count each custom item (they're removed when quantity <= 0)
+
+    const nonVariantCount = selectedAppliances.filter(a => a.quantity > 0 && !a.hasVariants).length;
+
+    const variantApplianceCount = Object.entries(variantSelections).reduce((sum, [applianceId, selections]) => {
+      const hasAnySelected = selections.some(s => s.quantity > 0);
+      return sum + (hasAnySelected ? 1 : 0);
     }, 0);
-    return applianceCount + variantCount + customEquipment.length;
+
+    return nonVariantCount + variantApplianceCount + customEquipment.length;
   }, [selectedAppliances, variantSelections, customEquipment]);
 
   const hasHeavyDutySelected = useMemo(

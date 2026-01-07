@@ -5,13 +5,36 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+export type EquipmentCategory = 'none' | 'has_motor' | 'produce_heat';
 
 export interface CustomEquipment {
   id: string;
   name: string;
   wattage: number;
   quantity: number;
+  category: EquipmentCategory;
 }
+
+// Surge multipliers based on category
+export const CATEGORY_SURGE: Record<EquipmentCategory, number> = {
+  none: 1,
+  has_motor: 3,
+  produce_heat: 1.5,
+};
+
+const categoryLabels: Record<EquipmentCategory, string> = {
+  none: 'None',
+  has_motor: 'Has Motor',
+  produce_heat: 'Produce Heat',
+};
 
 interface CustomEquipmentInputProps {
   customEquipment: CustomEquipment[];
@@ -28,6 +51,7 @@ export const CustomEquipmentInput = memo(function CustomEquipmentInput({
 }: CustomEquipmentInputProps) {
   const [name, setName] = useState('');
   const [wattage, setWattage] = useState('');
+  const [category, setCategory] = useState<EquipmentCategory>('none');
   const [showForm, setShowForm] = useState(false);
 
   const handleAdd = () => {
@@ -37,11 +61,13 @@ export const CustomEquipmentInput = memo(function CustomEquipmentInput({
       id: `custom_${Date.now()}`,
       name: name.trim(),
       wattage: Number(wattage),
-      quantity: 1
+      quantity: 1,
+      category,
     });
     
     setName('');
     setWattage('');
+    setCategory('none');
     setShowForm(false);
   };
 
@@ -97,6 +123,20 @@ export const CustomEquipmentInput = memo(function CustomEquipmentInput({
               />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="equipment-category" className="text-xs">Equipment Category</Label>
+            <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
+              <SelectTrigger id="equipment-category" className="h-9">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (no surge)</SelectItem>
+                <SelectItem value="has_motor">Has Motor (3x surge)</SelectItem>
+                <SelectItem value="produce_heat">Produce Heat (1.5x surge)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           
           <div className="flex gap-2">
             <Button size="sm" onClick={handleAdd} disabled={!name.trim() || !wattage}>
@@ -118,7 +158,9 @@ export const CustomEquipmentInput = memo(function CustomEquipmentInput({
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{eq.name}</p>
-                <p className="text-xs text-muted-foreground">{eq.wattage}W (custom)</p>
+                <p className="text-xs text-muted-foreground">
+                  {eq.wattage}W • {categoryLabels[eq.category]} (custom)
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-background/50 rounded-lg p-1">

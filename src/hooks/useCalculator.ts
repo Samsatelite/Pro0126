@@ -12,6 +12,7 @@ import {
   type ApplianceVariant,
 } from '@/data/appliances';
 import type { CustomEquipment } from '@/components/CustomEquipmentInput';
+import { CATEGORY_SURGE } from '@/components/CustomEquipmentInput';
 
 // Constants
 const POWER_FACTOR = 0.8;
@@ -268,11 +269,16 @@ export function useCalculator() {
   const calculations = useMemo((): CalculationResult => {
     const activeAppliances = selectedAppliances.filter(a => a.quantity > 0);
     
-    // Calculate custom equipment load
+    // Calculate custom equipment load and surge
     const customLoad = customEquipment.reduce(
       (sum, eq) => sum + eq.wattage * eq.quantity,
       0
     );
+    
+    // Calculate custom equipment surge candidates
+    const customSurgeCandidates = customEquipment
+      .filter(eq => eq.quantity > 0 && CATEGORY_SURGE[eq.category] > 1)
+      .map(eq => eq.wattage * (CATEGORY_SURGE[eq.category] - 1));
 
     // Calculate load from appliances with variants
     let variantLoad = 0;
@@ -303,12 +309,12 @@ export function useCalculator() {
     // Total load
     const totalLoad = nonVariantLoad + variantLoad + customLoad;
 
-    // Calculate surge
+    // Calculate surge - include custom equipment surge
     const nonVariantSurgeCandidates = nonVariantAppliances
       .filter(a => a.surge > 1 && a.quantity > 0)
       .map(a => a.wattage * (a.surge - 1));
 
-    const allSurgeCandidates = [...nonVariantSurgeCandidates, ...variantSurgeCandidates];
+    const allSurgeCandidates = [...nonVariantSurgeCandidates, ...variantSurgeCandidates, ...customSurgeCandidates];
     const maxSurge = allSurgeCandidates.length > 0 
       ? Math.max(...allSurgeCandidates) 
       : 0;

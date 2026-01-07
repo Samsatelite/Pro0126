@@ -189,8 +189,8 @@ export const appliances: Appliance[] = [
   { id: 'vacuum', name: 'Vacuum Cleaner', wattage: 1000, surge: 2, category: 'heavy-duty', icon: 'Wind', isHeavyDuty: true, soloOnly: true },
 ];
 
-// IDs that should keep essentials when turning off
-export const essentialApplianceIds = ['led_bulb', 'phone_charger', 'ceiling_fan', 'standing_fan', 'laptop', 'router'];
+// IDs that should keep essentials when turning off - includes LED TV now
+export const essentialApplianceIds = ['led_bulb', 'phone_charger', 'ceiling_fan', 'standing_fan', 'laptop', 'led_tv', 'router'];
 
 // Fan IDs for AC conflict check
 export const fanApplianceIds = ['ceiling_fan', 'standing_fan'];

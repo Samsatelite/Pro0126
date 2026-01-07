@@ -37,6 +37,9 @@ const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<DialogType>(null);
   const [pendingAppliance, setPendingAppliance] = useState<ApplianceWithQuantity | null>(null);
+  
+  // Essentials-only mode (when toggle is OFF for heavy-duty)
+  const [essentialsOnlyMode, setEssentialsOnlyMode] = useState(false);
 
   // Store sizing data in sessionStorage for the contact form
   useEffect(() => {
@@ -163,6 +166,8 @@ const Index = () => {
                       hasSoloOnlySelected={hasSoloOnlySelected}
                       hasFansSelected={hasFansSelected}
                       selectedHeavyDutyIds={selectedHeavyDutyIds}
+                      essentialsOnlyMode={essentialsOnlyMode}
+                      onEssentialsOnlyToggle={setEssentialsOnlyMode}
                     />
                   ))}
                   

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { 
   Lightbulb, 
   UtensilsCrossed, 
@@ -88,6 +88,8 @@ interface CategorySectionProps {
   hasSoloOnlySelected?: boolean;
   hasFansSelected?: boolean;
   selectedHeavyDutyIds?: string[];
+  essentialsOnlyMode?: boolean;
+  onEssentialsOnlyToggle?: (enabled: boolean) => void;
 }
 
 export const CategorySection = memo(function CategorySection({
@@ -101,28 +103,30 @@ export const CategorySection = memo(function CategorySection({
   hasSoloOnlySelected = false,
   hasFansSelected = false,
   selectedHeavyDutyIds = [],
+  essentialsOnlyMode = false,
+  onEssentialsOnlyToggle,
 }: CategorySectionProps) {
-  const [essentialsOnly, setEssentialsOnly] = useState(false);
   
   const category = applianceCategories.find(c => c.id === categoryId);
   if (!category) return null;
 
   const IconComponent = iconMap[category.icon] || Zap;
   
-  // Count active appliances - for variant appliances, check if any variant is selected
-  const activeCount = appliances.filter(a => {
+  // Count active appliances - count total number of selected items
+  const activeCount = appliances.reduce((count, a) => {
     if (a.hasVariants && applianceVariants[a.id]) {
+      // For variant appliances, count the total quantity of all selected variants
       const selections = variantSelections[a.id] || [];
-      return selections.some(s => s.quantity > 0);
+      return count + selections.reduce((sum, s) => sum + s.quantity, 0);
     }
-    return a.quantity > 0;
-  }).length;
+    return count + a.quantity;
+  }, 0);
   
   const isHeavyDutyCategory = categoryId === 'heavy-duty';
 
   // Handle turning off non-essentials when toggle is switched OFF
   const handleEssentialsToggle = (checked: boolean) => {
-    setEssentialsOnly(!checked);
+    onEssentialsOnlyToggle?.(!checked);
     if (!checked) {
       // Turn OFF was clicked - reduce all non-essential devices to zero
       allAppliances.forEach(appliance => {
@@ -171,11 +175,11 @@ export const CategorySection = memo(function CategorySection({
             </div>
             <div className="flex items-center gap-2 ml-4">
               <Label htmlFor="essentials-toggle" className="text-xs text-muted-foreground whitespace-nowrap">
-                {essentialsOnly ? 'OFF' : 'ON'}
+                {essentialsOnlyMode ? 'OFF' : 'ON'}
               </Label>
               <Switch
                 id="essentials-toggle"
-                checked={!essentialsOnly}
+                checked={!essentialsOnlyMode}
                 onCheckedChange={handleEssentialsToggle}
               />
             </div>
@@ -197,6 +201,17 @@ export const CategorySection = memo(function CategorySection({
             selectedHeavyDutyIds, 
             hasSoloOnlySelected
           );
+          
+          // Check if this appliance is disabled due to essentials-only mode
+          // Essential IDs: led_bulb, phone_charger, ceiling_fan, standing_fan, laptop, led_tv, router
+          const isDisabledByEssentialsMode = essentialsOnlyMode && 
+            !essentialApplianceIds.includes(appliance.id) && 
+            !appliance.isHeavyDuty;
+          
+          const effectivelyDisabled = !canSelect || isDisabledByEssentialsMode;
+          const effectiveReason = isDisabledByEssentialsMode 
+            ? 'Disabled during heavy-duty use' 
+            : reason;
           
           // Check if this is AC and we should show the fan notice
           const showFanNoticeForAC = appliance.id === 'air_conditioner' && showAcFanNotice;
@@ -228,8 +243,8 @@ export const CategorySection = memo(function CategorySection({
                   isHeavyDuty={appliance.isHeavyDuty}
                   soloOnly={appliance.soloOnly}
                   allowMultiple={appliance.allowMultiple !== false}
-                  isDisabled={!canSelect}
-                  disabledReason={reason}
+                  isDisabled={effectivelyDisabled}
+                  disabledReason={effectiveReason}
                 />
               </div>
             );
@@ -239,7 +254,7 @@ export const CategorySection = memo(function CategorySection({
             <div 
               key={appliance.id}
               onClick={() => {
-                if (!canSelect && onDisabledApplianceClick) {
+                if (effectivelyDisabled && onDisabledApplianceClick) {
                   onDisabledApplianceClick(appliance);
                 }
               }}
@@ -247,8 +262,8 @@ export const CategorySection = memo(function CategorySection({
               <ApplianceCard
                 appliance={appliance}
                 onUpdateQuantity={onUpdateQuantity}
-                isDisabled={!canSelect}
-                disabledReason={reason}
+                isDisabled={effectivelyDisabled}
+                disabledReason={effectiveReason}
               />
             </div>
           );

@@ -170,7 +170,7 @@ export const CategorySection = memo(function CategorySection({
           <div className="flex items-center justify-between bg-muted/50 p-3 rounded-md mb-3">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">
-                It is recommended to switch off household appliances above when using heavy-duty device.
+                Would you switch off other appliances when using heavy-duties?
               </p>
             </div>
             <div className="flex items-center gap-2 ml-4">
@@ -185,10 +185,10 @@ export const CategorySection = memo(function CategorySection({
             </div>
           </div>
 
-          <div className="text-xs text-muted-foreground mb-3 bg-muted/50 p-3 rounded-md space-y-1">
-            <p className="font-medium text-foreground">Selection Rules:</p>
-            <p>• <span className="text-warning font-medium">Solo</span> appliances must be used alone</p>
-            <p>• Other heavy-duty: max 2 compatible appliances</p>
+          <div className="text-xs mb-3 bg-success/10 border border-success/20 p-3 rounded-md space-y-1">
+            <p className="font-medium text-success">Selection Rules:</p>
+            <p className="text-success/80">• <span className="text-success font-medium">Solo</span> appliances must be used alone</p>
+            <p className="text-success/80">• Other heavy-duty: max 2 compatible appliances</p>
           </div>
         </>
       )}

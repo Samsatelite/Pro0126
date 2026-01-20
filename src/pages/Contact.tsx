@@ -77,8 +77,8 @@ const Contact = () => {
     setIsSubmitting(true);
     
     try {
-      // Get inverter sizing data from sessionStorage if available
-      const storedData = sessionStorage.getItem('inverterSizingData');
+      // Get inverter sizing data from localStorage if available
+      const storedData = localStorage.getItem('inverterSizingData');
       const inverterSizing = storedData ? JSON.parse(storedData) : null;
 
       const { error } = await supabase

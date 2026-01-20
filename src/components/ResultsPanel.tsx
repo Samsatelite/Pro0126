@@ -136,7 +136,7 @@ export const ResultsPanel = memo(function ResultsPanel({
         <CardContent className="pt-4 space-y-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">
-              If you plan to use very heavy equipment or power a business, consult a qualified inverter engineer to choose the correct inverter size.
+              To use heavy equipments or power your business, chat with an expert.
             </p>
           </div>
           <Link 

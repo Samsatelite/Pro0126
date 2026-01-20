@@ -243,6 +243,8 @@ export function useCalculator() {
     setSelectedAppliances(appliances.map(a => ({ ...a, quantity: 0 })));
     setVariantSelections({});
     setCustomEquipment([]);
+    // Clear persisted data
+    localStorage.removeItem('inverterSizingData');
   }, []);
 
   // Check if fans are selected

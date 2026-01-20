@@ -31,7 +31,7 @@ const ReportDetails = () => {
   const [data, setData] = useState<StoredSizingData | null>(null);
 
   useEffect(() => {
-    const storedData = sessionStorage.getItem('inverterSizingData');
+    const storedData = localStorage.getItem('inverterSizingData');
     if (storedData) {
       const parsed = JSON.parse(storedData);
       // Ensure warnings and recommendations exist
@@ -72,7 +72,12 @@ const ReportDetails = () => {
   };
 
   const handleShare = async () => {
-    const shareText = `Check out my inverter load report!\n\nTotal Load: ${data?.calculations.totalLoad}W\nRecommended Inverter: ${data?.calculations.recommendedInverter} kVA\n\nGenerated with InverterSize.com`;
+    const activeAppliances = data?.appliances.filter(a => a.quantity > 0) || [];
+    const applianceList = activeAppliances
+      .map(a => `• ${a.name}: ${a.wattage}W x ${a.quantity} = ${a.wattage * a.quantity}W`)
+      .join('\n');
+    
+    const shareText = `Check out my inverter load report!\n\n📋 Selected Appliances:\n${applianceList}\n\n⚡ Total Load: ${data?.calculations.totalLoad}W\n🔌 Recommended Inverter: ${data?.calculations.recommendedInverter} kVA\n\nGenerated with InverterSize.com`;
     
     if (navigator.share) {
       try {
@@ -290,17 +295,6 @@ const ReportDetails = () => {
               </Card>
             )}
 
-            {/* Disclaimer */}
-            <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <p className="text-sm text-muted-foreground">
-                  <strong>Disclaimer:</strong> This report provides estimates for planning purposes only. 
-                  Actual power consumption may vary. Consult with a qualified solar installer for professional sizing recommendations.
-                  Calculations include a 20% safety margin, 50% surge diversity factor, and assume a power factor of 0.8.
-                </p>
-              </CardContent>
-            </Card>
-
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Button className="flex-1" onClick={handleDownload}>
@@ -313,11 +307,22 @@ const ReportDetails = () => {
               </Button>
             </div>
 
+            {/* Disclaimer */}
+            <Card className="bg-muted/30">
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Disclaimer:</strong> This report provides estimates for planning purposes only. 
+                  Actual power consumption may vary. Consult with a qualified solar installer for professional sizing recommendations.
+                  Calculations include a 20% safety margin, 50% surge diversity factor, and assume a power factor of 0.97.
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Footer */}
             <div className="text-center pt-4 pb-8 space-y-4">
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">
-                  If you plan to use very heavy equipment or power a business, consult a qualified inverter engineer to choose the correct inverter size.
+                  To use heavy equipments or power your business, chat with an expert.
                 </p>
                 <Link 
                   to="/contact" 

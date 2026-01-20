@@ -41,7 +41,7 @@ const Index = () => {
   // Essentials-only mode (when toggle is OFF for heavy-duty)
   const [essentialsOnlyMode, setEssentialsOnlyMode] = useState(false);
 
-  // Store sizing data in sessionStorage for the contact form
+  // Store sizing data in localStorage for persistence across sessions
   useEffect(() => {
     if (activeCount > 0) {
       const sizingData = {
@@ -70,7 +70,9 @@ const Index = () => {
           recommendations: calculations.recommendations,
         },
       };
-      sessionStorage.setItem('inverterSizingData', JSON.stringify(sizingData));
+      localStorage.setItem('inverterSizingData', JSON.stringify(sizingData));
+    } else {
+      // Don't clear localStorage when activeCount is 0 - only clear on explicit reset
     }
   }, [selectedAppliances, customEquipment, calculations, activeCount]);
 
@@ -131,13 +133,10 @@ const Index = () => {
           <div className="grid lg:grid-cols-[1fr,380px] gap-6">
             {/* Left Column - Appliance Selection */}
             <div className="space-y-6">
-              {/* Important Tips Banner */}
-              <EnergyTipBanner />
-
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-display text-2xl font-bold text-foreground">
-                    Calculate the Right Interver Size
+                    Calculate the Right Inverter Size
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">
                     Select your appliances and get an accurate inverter recommendation.
@@ -149,6 +148,9 @@ const Index = () => {
                   </div>
                 )}
               </div>
+
+              {/* Important Tips Banner */}
+              <EnergyTipBanner />
 
               <ScrollArea className="h-[calc(100vh-320px)] pr-4">
                 <div className="space-y-8 pb-6">

@@ -31,6 +31,8 @@ export function generatePDFContent(data: PDFData): string {
   <title>Solar Inverter Load Report</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { margin: 20mm; }
+    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #1a1a2e;
@@ -40,7 +42,9 @@ export function generatePDFContent(data: PDFData): string {
       margin: 0 auto;
     }
     .header { 
-      text-align: center; 
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 40px;
       padding-bottom: 20px;
       border-bottom: 3px solid #FB8500;
@@ -48,11 +52,12 @@ export function generatePDFContent(data: PDFData): string {
     .header h1 { 
       font-size: 28px; 
       color: #1a1a2e;
-      margin-bottom: 8px;
+      margin: 0;
     }
     .header .date { 
       color: #666; 
-      font-size: 14px; 
+      font-size: 14px;
+      text-align: right;
     }
     .section { margin-bottom: 30px; }
     .section-title { 
@@ -76,8 +81,13 @@ export function generatePDFContent(data: PDFData): string {
       text-align: center;
     }
     .stat-card.highlight {
-      background: #FB8500;
-      color: white;
+      background: #FB8500 !important;
+      color: white !important;
+    }
+    .stat-card.highlight .stat-label,
+    .stat-card.highlight .stat-value,
+    .stat-card.highlight .stat-unit {
+      color: white !important;
     }
     .stat-label { 
       font-size: 12px; 
@@ -193,11 +203,12 @@ export function generatePDFContent(data: PDFData): string {
 
 export function downloadPDF(data: PDFData): void {
   const htmlContent = generatePDFContent(data);
-  const printWindow = window.open('', '_blank');
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const printWindow = window.open(url, '_blank');
   if (printWindow) {
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
     printWindow.onload = () => {
+      URL.revokeObjectURL(url);
       printWindow.print();
     };
   }

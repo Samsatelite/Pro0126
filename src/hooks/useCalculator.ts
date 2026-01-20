@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
   appliances, 
   inverterSizes, 
@@ -13,6 +13,15 @@ import {
 } from '@/data/appliances';
 import type { CustomEquipment } from '@/components/CustomEquipmentInput';
 import { CATEGORY_SURGE } from '@/components/CustomEquipmentInput';
+
+// Storage key for persisting user selections
+const STORAGE_KEY = 'inverterCalculatorState';
+
+interface PersistedState {
+  selectedAppliances: ApplianceWithQuantity[];
+  variantSelections: Record<string, VariantSelection[]>;
+  customEquipment: CustomEquipment[];
+}
 
 // Constants
 const POWER_FACTOR = 0.97;
@@ -42,13 +51,60 @@ function isAllowedCombination(id1: string, id2: string): boolean {
   );
 }
 
+// Load persisted state from localStorage
+function loadPersistedState(): PersistedState | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load persisted state:', e);
+  }
+  return null;
+}
+
+// Initialize state from localStorage or defaults
+function getInitialAppliances(): ApplianceWithQuantity[] {
+  const persisted = loadPersistedState();
+  if (persisted?.selectedAppliances) {
+    // Merge persisted quantities with current appliance definitions
+    return appliances.map(a => {
+      const persistedAppliance = persisted.selectedAppliances.find(p => p.id === a.id);
+      return { ...a, quantity: persistedAppliance?.quantity || 0 };
+    });
+  }
+  return appliances.map(a => ({ ...a, quantity: 0 }));
+}
+
+function getInitialVariantSelections(): Record<string, VariantSelection[]> {
+  const persisted = loadPersistedState();
+  return persisted?.variantSelections || {};
+}
+
+function getInitialCustomEquipment(): CustomEquipment[] {
+  const persisted = loadPersistedState();
+  return persisted?.customEquipment || [];
+}
+
 export function useCalculator() {
-  const [selectedAppliances, setSelectedAppliances] = useState<ApplianceWithQuantity[]>(
-    appliances.map(a => ({ ...a, quantity: 0 }))
-  );
-  
-  const [variantSelections, setVariantSelections] = useState<Record<string, VariantSelection[]>>({});
-  const [customEquipment, setCustomEquipment] = useState<CustomEquipment[]>([]);
+  const [selectedAppliances, setSelectedAppliances] = useState<ApplianceWithQuantity[]>(getInitialAppliances);
+  const [variantSelections, setVariantSelections] = useState<Record<string, VariantSelection[]>>(getInitialVariantSelections);
+  const [customEquipment, setCustomEquipment] = useState<CustomEquipment[]>(getInitialCustomEquipment);
+
+  // Persist state to localStorage whenever it changes
+  useEffect(() => {
+    const state: PersistedState = {
+      selectedAppliances,
+      variantSelections,
+      customEquipment,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error('Failed to persist state:', e);
+    }
+  }, [selectedAppliances, variantSelections, customEquipment]);
 
   const addCustomEquipment = useCallback((equipment: CustomEquipment) => {
     setCustomEquipment(prev => [...prev, equipment]);
@@ -243,7 +299,8 @@ export function useCalculator() {
     setSelectedAppliances(appliances.map(a => ({ ...a, quantity: 0 })));
     setVariantSelections({});
     setCustomEquipment([]);
-    // Clear persisted data
+    // Clear all persisted data
+    localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('inverterSizingData');
   }, []);
 

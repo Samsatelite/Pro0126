@@ -195,7 +195,7 @@ export const essentialApplianceIds = ['led_bulb', 'phone_charger', 'ceiling_fan'
 // Fan IDs for AC conflict check
 export const fanApplianceIds = ['ceiling_fan', 'standing_fan'];
 
-export const inverterSizes = [1.5, 2.5, 3.5, 5, 7.5, 10, 15, 20, 30, 40, 50];
+export const inverterSizes = [1, 1, 1.2, 1.5, 2, 2.2, 2.3, 2.5, 2.7, 2.8, 3, 3.2, 3.5, 3.6, 3.8, 4, 4.2, 5, 5.5, 6, 6.2, 7.5, 8, 8.2, 10, 12, 15, 16, 20, 30, 40, 50];
 
 // Helper function to check if two heavy-duty appliances can be combined
 export function canCombine(id1: string, id2: string): boolean {

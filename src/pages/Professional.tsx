@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,9 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw } from 'lucide-react';
+import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw, Download, Share2 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import { toast } from 'sonner';
 
 type ConnectionType = 'series' | 'parallel' | 'series-parallel';
 
@@ -29,24 +30,80 @@ interface CalculationResults {
   recommendedChargeController: number;
 }
 
+interface ProfessionalState {
+  inverterSize: string;
+  systemVoltage: string;
+  backupHours: string;
+  batteryVoltage: string;
+  batteryAh: string;
+  batteryConnection: ConnectionType;
+  solarHours: string;
+  panelWattage: string;
+  panelVoltage: string;
+  panelConnection: ConnectionType;
+  showResults: boolean;
+}
+
+const STORAGE_KEY = 'professionalCalculatorState';
+
+const loadPersistedState = (): ProfessionalState | null => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load professional state:', e);
+  }
+  return null;
+};
+
+const saveState = (state: ProfessionalState) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Failed to save professional state:', e);
+  }
+};
+
 const Professional = () => {
+  const persistedState = loadPersistedState();
+
   // Inverter inputs
-  const [inverterSize, setInverterSize] = useState<string>('');
-  const [systemVoltage, setSystemVoltage] = useState<string>('24');
-  const [backupHours, setBackupHours] = useState<string>('4');
+  const [inverterSize, setInverterSize] = useState<string>(persistedState?.inverterSize || '');
+  const [systemVoltage, setSystemVoltage] = useState<string>(persistedState?.systemVoltage || '24');
+  const [backupHours, setBackupHours] = useState<string>(persistedState?.backupHours || '4');
 
   // Battery inputs
-  const [batteryVoltage, setBatteryVoltage] = useState<string>('12');
-  const [batteryAh, setBatteryAh] = useState<string>('200');
-  const [batteryConnection, setBatteryConnection] = useState<ConnectionType>('series');
+  const [batteryVoltage, setBatteryVoltage] = useState<string>(persistedState?.batteryVoltage || '12');
+  const [batteryAh, setBatteryAh] = useState<string>(persistedState?.batteryAh || '200');
+  const [batteryConnection, setBatteryConnection] = useState<ConnectionType>(persistedState?.batteryConnection || 'series');
 
   // Solar inputs
-  const [solarHours, setSolarHours] = useState<string>('5');
-  const [panelWattage, setPanelWattage] = useState<string>('450');
-  const [panelVoltage, setPanelVoltage] = useState<string>('40');
-  const [panelConnection, setPanelConnection] = useState<ConnectionType>('series');
+  const [solarHours, setSolarHours] = useState<string>(persistedState?.solarHours || '5');
+  const [panelWattage, setPanelWattage] = useState<string>(persistedState?.panelWattage || '450');
+  const [panelVoltage, setPanelVoltage] = useState<string>(persistedState?.panelVoltage || '40');
+  const [panelConnection, setPanelConnection] = useState<ConnectionType>(persistedState?.panelConnection || 'series');
 
-  const [showResults, setShowResults] = useState(false);
+  const [showResults, setShowResults] = useState(persistedState?.showResults || false);
+
+  // Persist state on changes
+  useEffect(() => {
+    const state: ProfessionalState = {
+      inverterSize,
+      systemVoltage,
+      backupHours,
+      batteryVoltage,
+      batteryAh,
+      batteryConnection,
+      solarHours,
+      panelWattage,
+      panelVoltage,
+      panelConnection,
+      showResults,
+    };
+    saveState(state);
+  }, [inverterSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection, showResults]);
 
   const calculations = useMemo((): CalculationResults | null => {
     const invSize = parseFloat(inverterSize);
@@ -68,9 +125,9 @@ const Professional = () => {
     // Calculate energy needed for backup (Wh)
     const energyNeeded = inverterWatts * backup;
 
-    // Account for inverter efficiency (85%) and depth of discharge (50% for lead-acid, 80% for lithium)
-    const dod = 0.5; // Depth of discharge
-    const efficiency = 0.85;
+    // Account for inverter efficiency (90%) and depth of discharge (80%)
+    const dod = 0.8; // Depth of discharge
+    const efficiency = 0.9;
     const usableEnergy = energyNeeded / (dod * efficiency);
 
     // Calculate battery bank requirements
@@ -135,6 +192,225 @@ const Professional = () => {
     setPanelVoltage('40');
     setPanelConnection('series');
     setShowResults(false);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
+  const handleDownload = () => {
+    if (!calculations) return;
+
+    const date = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Professional Solar System Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { margin: 20mm; }
+    @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #1a1a2e;
+      line-height: 1.6;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .header { 
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid #FB8500;
+    }
+    .header h1 { 
+      font-size: 28px; 
+      color: #1a1a2e;
+      margin: 0;
+    }
+    .header .date { 
+      color: #666; 
+      font-size: 14px;
+      text-align: right;
+    }
+    .section { margin-bottom: 30px; }
+    .section-title { 
+      font-size: 18px;
+      font-weight: 600;
+      color: #FB8500;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .stat-card {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+    }
+    .stat-card.highlight {
+      background: #FB8500 !important;
+      color: white !important;
+    }
+    .stat-card.highlight .stat-label,
+    .stat-card.highlight .stat-value,
+    .stat-card.highlight .stat-unit {
+      color: white !important;
+    }
+    .stat-label { 
+      font-size: 12px; 
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+    .stat-value { font-size: 24px; font-weight: 700; }
+    .stat-unit { font-size: 14px; opacity: 0.8; }
+    .config-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .config-table th, .config-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    .config-table th { background: #f8f9fa; font-weight: 600; font-size: 12px; text-transform: uppercase; color: #666; }
+    .notes-box { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+    .list-item { margin: 8px 0; padding-left: 15px; position: relative; font-size: 13px; }
+    .list-item::before { content: "•"; position: absolute; left: 0; }
+    .disclaimer { margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 12px; color: #666; }
+    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Professional Solar System Report</h1>
+    <p class="date">Generated on ${date}</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">System Configuration</div>
+    <table class="config-table">
+      <tr><th>Parameter</th><th>Value</th></tr>
+      <tr><td>Inverter Size</td><td>${inverterSize} kVA</td></tr>
+      <tr><td>System Voltage</td><td>${systemVoltage}V</td></tr>
+      <tr><td>Backup Hours</td><td>${backupHours} hours</td></tr>
+      <tr><td>Battery Voltage</td><td>${batteryVoltage}V</td></tr>
+      <tr><td>Battery Capacity</td><td>${batteryAh}Ah</td></tr>
+      <tr><td>Battery Connection</td><td>${batteryConnection}</td></tr>
+      <tr><td>Solar Hours/Day</td><td>${solarHours} hours</td></tr>
+      <tr><td>Panel Wattage</td><td>${panelWattage}W</td></tr>
+      <tr><td>Panel Vmp</td><td>${panelVoltage}V</td></tr>
+      <tr><td>Panel Connection</td><td>${panelConnection}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Calculation Results</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Minimum Batteries</div>
+        <div class="stat-value">${calculations.minBatteries}</div>
+        <div class="stat-unit">${calculations.batteryBankVoltage}V / ${calculations.batteryBankAh}Ah bank</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Solar Panels Needed</div>
+        <div class="stat-value">${calculations.totalPanels}</div>
+        <div class="stat-unit">${calculations.panelArrayWattage}W array</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Daily Production</div>
+        <div class="stat-value">${calculations.dailyEnergyProduction}</div>
+        <div class="stat-unit">Wh per day</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-label">Charge Controller</div>
+        <div class="stat-value">${calculations.recommendedChargeController}A</div>
+        <div class="stat-unit">MPPT recommended</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Important Notes</div>
+    <div class="notes-box">
+      <div class="list-item">Calculations assume 80% depth of discharge</div>
+      <div class="list-item">90% inverter efficiency is factored into the calculations</div>
+      <div class="list-item">20% solar production overhead is included for real-world conditions</div>
+      <div class="list-item">Always consult a qualified engineer for final system design</div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>Disclaimer:</strong> This report provides estimates for planning purposes only. 
+    Actual system performance may vary based on installation, weather, and equipment quality.
+    Consult with a qualified solar installer for professional sizing recommendations.
+  </div>
+
+  <div class="footer">InverterSize.com - Professional Solar System Calculator</div>
+</body>
+</html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => {
+        URL.revokeObjectURL(url);
+        printWindow.print();
+      };
+    }
+  };
+
+  const handleShare = async () => {
+    if (!calculations) return;
+
+    const shareText = `Professional Solar System Report
+
+Configuration:
+• Inverter: ${inverterSize} kVA @ ${systemVoltage}V
+• Backup: ${backupHours} hours
+• Battery: ${batteryVoltage}V ${batteryAh}Ah (${batteryConnection})
+• Solar: ${panelWattage}W panels @ ${solarHours}h/day (${panelConnection})
+
+Results:
+• Batteries needed: ${calculations.minBatteries} (${calculations.batteryBankVoltage}V/${calculations.batteryBankAh}Ah bank)
+• Solar panels: ${calculations.totalPanels} (${calculations.panelArrayWattage}W array)
+• Daily production: ${calculations.dailyEnergyProduction} Wh
+• Charge controller: ${calculations.recommendedChargeController}A MPPT
+
+Generated with InverterSize.com`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Professional Solar System Report',
+          text: shareText,
+        });
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          copyToClipboard(shareText);
+        }
+      }
+    } else {
+      copyToClipboard(shareText);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Report copied to clipboard!');
+    } catch {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   const getConnectionDescription = (type: ConnectionType, component: 'battery' | 'panel') => {
@@ -416,14 +692,26 @@ const Professional = () => {
 
                   <Separator className="my-4" />
 
+                  {/* Download & Share Buttons */}
+                  <div className="flex flex-wrap gap-3 justify-center mb-4">
+                    <Button onClick={handleDownload} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Download Report
+                    </Button>
+                    <Button variant="outline" onClick={handleShare} className="gap-2">
+                      <Share2 className="h-4 w-4" />
+                      Share Report
+                    </Button>
+                  </div>
+
                   <div className="bg-muted/50 rounded-lg p-4">
                     <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
                       <Info className="h-4 w-4 text-primary" />
                       Important Notes
                     </h4>
                     <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Calculations assume 50% depth of discharge for battery longevity</li>
-                      <li>85% inverter efficiency is factored into the calculations</li>
+                      <li>Calculations assume 80% depth of discharge for battery longevity</li>
+                      <li>90% inverter efficiency is factored into the calculations</li>
                       <li>20% solar production overhead is included for real-world conditions</li>
                       <li>Always consult a qualified engineer for final system design</li>
                     </ul>

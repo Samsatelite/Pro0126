@@ -31,7 +31,7 @@ interface CalculationResults {
 }
 
 interface ProfessionalState {
-  inverterSize: string;
+  loadSize: string;
   systemVoltage: string;
   backupHours: string;
   batteryVoltage: string;
@@ -69,8 +69,8 @@ const saveState = (state: ProfessionalState) => {
 const Professional = () => {
   const persistedState = loadPersistedState();
 
-  // Inverter inputs
-  const [inverterSize, setInverterSize] = useState<string>(persistedState?.inverterSize || '');
+  // Load inputs
+  const [loadSize, setLoadSize] = useState<string>(persistedState?.loadSize || '');
   const [systemVoltage, setSystemVoltage] = useState<string>(persistedState?.systemVoltage || '24');
   const [backupHours, setBackupHours] = useState<string>(persistedState?.backupHours || '4');
 
@@ -90,7 +90,7 @@ const Professional = () => {
   // Persist state on changes
   useEffect(() => {
     const state: ProfessionalState = {
-      inverterSize,
+      loadSize,
       systemVoltage,
       backupHours,
       batteryVoltage,
@@ -103,10 +103,10 @@ const Professional = () => {
       showResults,
     };
     saveState(state);
-  }, [inverterSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection, showResults]);
+  }, [loadSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection, showResults]);
 
   const calculations = useMemo((): CalculationResults | null => {
-    const invSize = parseFloat(inverterSize);
+    const load = parseFloat(loadSize);
     const sysVolt = parseFloat(systemVoltage);
     const backup = parseFloat(backupHours);
     const batVolt = parseFloat(batteryVoltage);
@@ -115,20 +115,19 @@ const Professional = () => {
     const pnlWatt = parseFloat(panelWattage);
     const pnlVolt = parseFloat(panelVoltage);
 
-    if (!invSize || !sysVolt || !backup || !batVolt || !batAh || !sunHours || !pnlWatt || !pnlVolt) {
+    if (!load || !sysVolt || !backup || !batVolt || !batAh || !sunHours || !pnlWatt || !pnlVolt) {
       return null;
     }
 
-    // Convert kVA to watts (assuming 0.8 power factor)
-    const inverterWatts = invSize * 1000 * 0.8;
+    // Load is already in watts
+    const loadWatts = load;
 
     // Calculate energy needed for backup (Wh)
-    const energyNeeded = inverterWatts * backup;
+    const energyNeeded = loadWatts * backup;
 
-    // Account for inverter efficiency (90%) and depth of discharge (80%)
-    const dod = 0.8; // Depth of discharge
-    const efficiency = 0.9;
-    const usableEnergy = energyNeeded / (dod * efficiency);
+    // Account for depth of discharge (90%)
+    const dod = 0.9; // Depth of discharge
+    const usableEnergy = energyNeeded / dod;
 
     // Calculate battery bank requirements
     const batteriesInSeries = sysVolt / batVolt;
@@ -139,7 +138,7 @@ const Professional = () => {
 
     // Calculate solar panel requirements
     // Daily energy production should cover usage plus 20% for losses
-    const dailyUsage = inverterWatts * 6; // Assume 6 hours of average daily use
+    const dailyUsage = loadWatts * 6; // Assume 6 hours of average daily use
     const requiredDailyProduction = dailyUsage * 1.2;
     const panelsNeeded = Math.ceil(requiredDailyProduction / (pnlWatt * sunHours));
     
@@ -172,7 +171,7 @@ const Professional = () => {
       dailyEnergyProduction: Math.round(dailyEnergyProduction),
       recommendedChargeController,
     };
-  }, [inverterSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection]);
+  }, [loadSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection]);
 
   const handleCalculate = () => {
     if (calculations) {
@@ -181,7 +180,7 @@ const Professional = () => {
   };
 
   const handleReset = () => {
-    setInverterSize('');
+    setLoadSize('');
     setSystemVoltage('24');
     setBackupHours('4');
     setBatteryVoltage('12');
@@ -298,7 +297,7 @@ const Professional = () => {
     <div class="section-title">System Configuration</div>
     <table class="config-table">
       <tr><th>Parameter</th><th>Value</th></tr>
-      <tr><td>Inverter Size</td><td>${inverterSize} kVA</td></tr>
+      <tr><td>Load Size</td><td>${loadSize}W</td></tr>
       <tr><td>System Voltage</td><td>${systemVoltage}V</td></tr>
       <tr><td>Backup Hours</td><td>${backupHours} hours</td></tr>
       <tr><td>Battery Voltage</td><td>${batteryVoltage}V</td></tr>
@@ -340,8 +339,7 @@ const Professional = () => {
   <div class="section">
     <div class="section-title">Important Notes</div>
     <div class="notes-box">
-      <div class="list-item">Calculations assume 80% depth of discharge</div>
-      <div class="list-item">90% inverter efficiency is factored into the calculations</div>
+      <div class="list-item">Calculations assume 90% depth of discharge</div>
       <div class="list-item">20% solar production overhead is included for real-world conditions</div>
       <div class="list-item">Always consult a qualified engineer for final system design</div>
     </div>
@@ -375,7 +373,7 @@ const Professional = () => {
     const shareText = `Professional Solar System Report
 
 Configuration:
-• Inverter: ${inverterSize} kVA @ ${systemVoltage}V
+• Load: ${loadSize}W @ ${systemVoltage}V
 • Backup: ${backupHours} hours
 • Battery: ${batteryVoltage}V ${batteryAh}Ah (${batteryConnection})
 • Solar: ${panelWattage}W panels @ ${solarHours}h/day (${panelConnection})
@@ -459,24 +457,24 @@ Generated with InverterSize.com`;
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Inverter Configuration */}
+              {/* Load Configuration */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-primary" />
-                    Inverter Configuration
+                    Load Configuration
                   </CardTitle>
-                  <CardDescription>Set your inverter specifications</CardDescription>
+                  <CardDescription>Set your load specifications</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="inverterSize">Inverter Size (kVA)</Label>
+                    <Label htmlFor="loadSize">Load Size (Watts)</Label>
                     <Input
-                      id="inverterSize"
+                      id="loadSize"
                       type="number"
-                      placeholder="e.g., 5"
-                      value={inverterSize}
-                      onChange={(e) => setInverterSize(e.target.value)}
+                      placeholder="e.g., 2000"
+                      value={loadSize}
+                      onChange={(e) => setLoadSize(e.target.value)}
                     />
                   </div>
 
@@ -710,8 +708,7 @@ Generated with InverterSize.com`;
                       Important Notes
                     </h4>
                     <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Calculations assume 80% depth of discharge for battery longevity</li>
-                      <li>90% inverter efficiency is factored into the calculations</li>
+                      <li>Calculations assume 90% depth of discharge</li>
                       <li>20% solar production overhead is included for real-world conditions</li>
                       <li>Always consult a qualified engineer for final system design</li>
                     </ul>

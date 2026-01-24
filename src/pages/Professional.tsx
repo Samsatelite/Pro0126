@@ -125,8 +125,8 @@ const Professional = () => {
     // Calculate energy needed for backup (Wh)
     const energyNeeded = loadWatts * backup;
 
-    // Account for depth of discharge (90%)
-    const dod = 0.9; // Depth of discharge
+    // Account for depth of discharge (100%)
+    const dod = 1.0; // Depth of discharge
     const usableEnergy = energyNeeded / dod;
 
     // Calculate battery bank requirements

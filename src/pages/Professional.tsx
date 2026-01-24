@@ -339,7 +339,6 @@ const Professional = () => {
   <div class="section">
     <div class="section-title">Important Notes</div>
     <div class="notes-box">
-      <div class="list-item">Calculations assume 90% depth of discharge</div>
       <div class="list-item">20% solar production overhead is included for real-world conditions</div>
       <div class="list-item">Always consult a qualified engineer for final system design</div>
     </div>
@@ -708,7 +707,6 @@ Generated with InverterSize.com`;
                       Important Notes
                     </h4>
                     <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Calculations assume 90% depth of discharge</li>
                       <li>20% solar production overhead is included for real-world conditions</li>
                       <li>Always consult a qualified engineer for final system design</li>
                     </ul>

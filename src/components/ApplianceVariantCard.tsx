@@ -134,7 +134,7 @@ export const ApplianceVariantCard = memo(function ApplianceVariantCard({
           )}
         </div>
 
-        <DropdownMenu>
+        <DropdownMenu modal={true}>
           <DropdownMenuTrigger asChild>
             <Button 
               variant={isActive ? "default" : "outline"} 

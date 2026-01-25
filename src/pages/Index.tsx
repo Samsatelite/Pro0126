@@ -134,14 +134,9 @@ const Index = () => {
             {/* Left Column - Appliance Selection */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-display text-2xl font-bold text-foreground">
-                    Calculate the Right Inverter Size
-                  </h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Select your appliances and get an accurate inverter recommendation.
-                  </p>
-                </div>
+                <h2 className="font-display text-2xl font-bold text-foreground">
+                  Calculate the Right Inverter Size
+                </h2>
                 {activeCount > 0 && (
                   <div className="text-sm font-medium text-primary">
                     {activeCount} appliance{activeCount !== 1 ? 's' : ''} selected

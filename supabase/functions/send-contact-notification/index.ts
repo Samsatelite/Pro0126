@@ -1,10 +1,59 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// HTML escape function to prevent XSS
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Zod schemas for input validation
+const ApplianceSchema = z.object({
+  name: z.string().max(200),
+  wattage: z.number().min(0).max(100000),
+  quantity: z.number().int().min(0).max(100),
+  isHeavyDuty: z.boolean().optional(),
+  soloOnly: z.boolean().optional(),
+});
+
+const CalculationsSchema = z.object({
+  totalLoad: z.number().min(0).optional(),
+  peakSurge: z.number().min(0).optional(),
+  requiredKva: z.number().min(0).optional(),
+  recommendedInverter: z.number().min(0).optional(),
+  warnings: z.array(z.string().max(500)).optional(),
+  recommendations: z.array(z.string().max(500)).optional(),
+});
+
+const InverterSizingSchema = z.object({
+  appliances: z.array(ApplianceSchema).max(100).optional(),
+  calculations: CalculationsSchema.optional(),
+  totalWattage: z.number().min(0).optional(),
+  recommendedInverterSize: z.number().min(0).optional(),
+}).nullable();
+
+const ContactNotificationSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  email: z.string().email("Invalid email").max(255).nullable().or(z.literal("")),
+  phone: z.string().max(30).nullable().or(z.literal("")),
+  location: z.string().max(200).nullable().or(z.literal("")),
+  message: z.string().trim().min(10, "Message must be at least 10 characters").max(2000, "Message must be less than 2000 characters"),
+  contactMethod: z.enum(["whatsapp", "email"]),
+  inverterSizing: InverterSizingSchema,
+});
+
+type ContactNotificationRequest = z.infer<typeof ContactNotificationSchema>;
 
 interface Appliance {
   name: string;
@@ -30,16 +79,6 @@ interface InverterSizing {
   recommendedInverterSize?: number;
 }
 
-interface ContactNotificationRequest {
-  name: string;
-  email: string | null;
-  phone: string | null;
-  location: string | null;
-  message: string;
-  contactMethod: string;
-  inverterSizing: InverterSizing | null;
-}
-
 function generatePDFReport(sizing: InverterSizing, contactName: string): string {
   const appliances = sizing.appliances ?? [];
   const calcs = sizing.calculations ?? {};
@@ -53,7 +92,7 @@ function generatePDFReport(sizing: InverterSizing, contactName: string): string 
 
   const applianceRows = appliances.map(a => `
     <tr>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${a.name}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(a.name)}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${a.wattage}W</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">${a.quantity}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${a.wattage * a.quantity}W</td>
@@ -65,7 +104,7 @@ function generatePDFReport(sizing: InverterSizing, contactName: string): string 
       <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 4px;">
         <h4 style="margin: 0 0 8px 0; color: #92400e; font-size: 14px;">⚠️ Warnings</h4>
         <ul style="margin: 0; padding-left: 20px; color: #92400e; font-size: 13px;">
-          ${warnings.map(w => `<li style="margin-bottom: 4px;">${w}</li>`).join('')}
+          ${warnings.map(w => `<li style="margin-bottom: 4px;">${escapeHtml(w)}</li>`).join('')}
         </ul>
       </div>
     ` : '';
@@ -75,7 +114,7 @@ function generatePDFReport(sizing: InverterSizing, contactName: string): string 
       <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 4px;">
         <h4 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;">💡 Recommendations</h4>
         <ul style="margin: 0; padding-left: 20px; color: #1e40af; font-size: 13px;">
-          ${recommendations.map(r => `<li style="margin-bottom: 4px;">${r}</li>`).join('')}
+          ${recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
         </ul>
       </div>
     ` : '';
@@ -84,7 +123,7 @@ function generatePDFReport(sizing: InverterSizing, contactName: string): string 
     <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; margin-top: 30px;">
       <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ff7900;">
         <h2 style="color: #ff7900; margin: 0; font-size: 24px;">⚡ Inverter Load Report</h2>
-        <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 14px;">Generated for ${contactName}</p>
+        <p style="color: #6b7280; margin: 8px 0 0 0; font-size: 14px;">Generated for ${escapeHtml(contactName)}</p>
         <p style="color: #9ca3af; margin: 4px 0 0 0; font-size: 12px;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
 
@@ -161,8 +200,31 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("RESEND_API_KEY is not configured");
     }
 
-    const data: ContactNotificationRequest = await req.json();
-    console.log("Received contact notification request:", data);
+    // Parse and validate input with Zod
+    let rawData: unknown;
+    try {
+      rawData = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON payload" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const parseResult = ContactNotificationSchema.safeParse(rawData);
+    if (!parseResult.success) {
+      console.error("Validation error:", parseResult.error.flatten());
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid request data", 
+          details: parseResult.error.flatten().fieldErrors 
+        }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const data: ContactNotificationRequest = parseResult.data;
+    console.log("Received validated contact notification request for:", escapeHtml(data.name));
 
     const pdfReport = data.inverterSizing 
       ? generatePDFReport(data.inverterSizing, data.name)
@@ -186,19 +248,19 @@ const handler = async (req: Request): Promise<Response> => {
           <table style="width: 100%; margin-bottom: 20px;">
             <tr>
               <td style="padding: 8px 0; color: #6b7280; width: 140px;">Name:</td>
-              <td style="padding: 8px 0; font-weight: 600;">${data.name}</td>
+              <td style="padding: 8px 0; font-weight: 600;">${escapeHtml(data.name)}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #6b7280;">Email:</td>
-              <td style="padding: 8px 0;">${data.email || '<span style="color: #9ca3af;">Not provided</span>'}</td>
+              <td style="padding: 8px 0;">${data.email ? escapeHtml(data.email) : '<span style="color: #9ca3af;">Not provided</span>'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #6b7280;">Phone:</td>
-              <td style="padding: 8px 0;">${data.phone || '<span style="color: #9ca3af;">Not provided</span>'}</td>
+              <td style="padding: 8px 0;">${data.phone ? escapeHtml(data.phone) : '<span style="color: #9ca3af;">Not provided</span>'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #6b7280;">Location:</td>
-              <td style="padding: 8px 0;">${data.location || '<span style="color: #9ca3af;">Not provided</span>'}</td>
+              <td style="padding: 8px 0;">${data.location ? escapeHtml(data.location) : '<span style="color: #9ca3af;">Not provided</span>'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #6b7280;">Contact Method:</td>
@@ -212,7 +274,7 @@ const handler = async (req: Request): Promise<Response> => {
 
           <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-top: 20px;">
             <h3 style="margin: 0 0 10px 0; color: #374151; font-size: 14px;">Message:</h3>
-            <p style="margin: 0; color: #1f2937; white-space: pre-wrap;">${data.message}</p>
+            <p style="margin: 0; color: #1f2937; white-space: pre-wrap;">${escapeHtml(data.message)}</p>
           </div>
         </div>
 
@@ -239,7 +301,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         from: "InverterSize <onboarding@resend.dev>",
         to: ["samueldavid4star@gmail.com"],
-        subject: `New Contact: ${data.name} - ${data.inverterSizing?.calculations?.recommendedInverter ?? 'N/A'} kVA Inquiry`,
+        subject: `New Contact: ${escapeHtml(data.name)} - ${data.inverterSizing?.calculations?.recommendedInverter ?? 'N/A'} kVA Inquiry`,
         html: emailHtml,
       }),
     });
@@ -258,10 +320,11 @@ const handler = async (req: Request): Promise<Response> => {
         ...corsHeaders,
       },
     });
-  } catch (error: any) {
-    console.error("Error in send-contact-notification function:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+    console.error("Error in send-contact-notification function:", errorMessage);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

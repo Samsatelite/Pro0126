@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Menu, Zap, Calculator, Share2 } from 'lucide-react';
+import { Menu, Calculator, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logo from '@/assets/logo.svg';
 import { Button } from '@/components/ui/button';
@@ -70,11 +70,6 @@ export const Header = memo(function Header() {
           </Link>
           
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-              <Zap className="h-3.5 w-3.5 text-primary" />
-              <span>Real-time calculations</span>
-            </div>
-
             {/* Desktop Menu */}
             <nav className="hidden md:flex items-center gap-2">
               {menuItems.map((item) => (

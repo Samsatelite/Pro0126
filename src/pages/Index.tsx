@@ -119,7 +119,7 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>InverterSize - Accurate Inverter Size Calculator for Homes and Businesses</title>
+        <title>InverterSize - Accurate Solar Inverter Size Calculator for Homes and Businesses</title>
         <meta 
           name="description" 
           content="Find the right inverter size for your home or business with our smart inverter load calculator. Add your appliances, calculate total power consumption, and get accurate inverter size recommendations based on real-world usage and safe load balancing." 
@@ -135,7 +135,7 @@ const Index = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-2xl font-bold text-foreground">
-                  Calculate the Right Inverter Size
+                  Calculate Your Inverter Size
                 </h2>
                 {activeCount > 0 && (
                   <div className="text-sm font-medium text-primary">

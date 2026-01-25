@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, LogOut, Loader2, Users, Mail, Phone, MapPin, Calendar } from "lucide-react";
+import { ArrowLeft, LogOut, Loader2, Users, Mail, Phone, MapPin, Calendar, Download, Search, X } from "lucide-react";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface ContactSubmission {
@@ -34,8 +42,64 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingRole, setCheckingRole] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [contactMethodFilter, setContactMethodFilter] = useState<string>("all");
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Filter submissions based on search and contact method
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter((submission) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        submission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        submission.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        submission.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        submission.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        submission.message.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesContactMethod =
+        contactMethodFilter === "all" || submission.contact_method === contactMethodFilter;
+
+      return matchesSearch && matchesContactMethod;
+    });
+  }, [submissions, searchTerm, contactMethodFilter]);
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const headers = ["Name", "Email", "Phone", "Location", "Message", "Contact Method", "Inverter Size (kVA)", "Date"];
+    const csvData = filteredSubmissions.map((s) => [
+      s.name,
+      s.email || "",
+      s.phone || "",
+      s.location || "",
+      `"${s.message.replace(/"/g, '""')}"`,
+      s.contact_method,
+      s.inverter_sizing?.calculations?.recommendedInverter || "",
+      formatDate(s.created_at),
+    ]);
+
+    const csvContent = [headers.join(","), ...csvData.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `contact_submissions_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${filteredSubmissions.length} submissions to CSV.`,
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setContactMethodFilter("all");
+  };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -255,16 +319,56 @@ const AdminDashboard = () => {
 
         <Card className="border-border/50 bg-card/50">
           <CardHeader>
-            <CardTitle>Contact Submissions</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle>Contact Submissions</CardTitle>
+              <Button onClick={exportToCSV} variant="outline" size="sm" disabled={filteredSubmissions.length === 0}>
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, email, phone, location..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={contactMethodFilter} onValueChange={setContactMethodFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Contact method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+              {(searchTerm || contactMethodFilter !== "all") && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+            {filteredSubmissions.length !== submissions.length && (
+              <p className="text-sm text-muted-foreground mb-4">
+                Showing {filteredSubmissions.length} of {submissions.length} submissions
+              </p>
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
-            ) : submissions.length === 0 ? (
+            ) : filteredSubmissions.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No submissions yet.
+                {submissions.length === 0 ? "No submissions yet." : "No submissions match your filters."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -280,7 +384,7 @@ const AdminDashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {submissions.map((submission) => (
+                    {filteredSubmissions.map((submission) => (
                       <TableRow key={submission.id}>
                         <TableCell className="font-medium">
                           {submission.name}

@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw, Download, Share2 } from 'lucide-react';
+import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw, Download, Share2, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 
@@ -67,6 +68,7 @@ const saveState = (state: ProfessionalState) => {
 };
 
 const Professional = () => {
+  const navigate = useNavigate();
   const persistedState = loadPersistedState();
 
   // Load inputs
@@ -442,17 +444,28 @@ Generated with InverterSize.com`;
         <main className="container mx-auto px-4 py-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Page Header */}
-            <div className="text-center space-y-2">
-              <Badge variant="secondary" className="mb-2">
-                <Settings2 className="h-3 w-3 mr-1" />
-                Professional Mode
-              </Badge>
-              <h1 className="font-display text-3xl font-bold text-foreground">
-                Professional System Calculator
-              </h1>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Configure your solar power system with precise calculations for batteries, panels, and charge controllers.
-              </p>
+            <div className="space-y-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(-1)}
+                className="gap-2 mb-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="text-center space-y-2">
+                <Badge variant="secondary" className="mb-2">
+                  <Settings2 className="h-3 w-3 mr-1" />
+                  Professional Mode
+                </Badge>
+                <h1 className="font-display text-3xl font-bold text-foreground">
+                  Professional System Calculator
+                </h1>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  Configure your solar power system with precise calculations for batteries, panels, and charge controllers.
+                </p>
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">

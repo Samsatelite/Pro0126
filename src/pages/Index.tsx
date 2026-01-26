@@ -135,7 +135,7 @@ const Index = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-2xl font-bold text-foreground">
-                  Calculate Your Inverter Size
+                  Calculate your inverter size
                 </h2>
                 {activeCount > 0 && (
                   <div className="text-sm font-medium text-primary">

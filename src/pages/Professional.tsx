@@ -13,12 +13,46 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw, Download, Share2, ArrowLeft } from 'lucide-react';
+import { Battery, Sun, Zap, Settings2, Info, Calculator, RotateCcw, Download, Share2, ArrowLeft, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 
 type ConnectionType = 'series' | 'parallel' | 'series-parallel';
+
+const STANDARD_MCB_SIZES = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+const STANDARD_CABLE_SIZES = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95];
+
+// Cable current capacity (approximate for copper, PVC insulated)
+const CABLE_CURRENT_RATINGS: [number, number][] = [
+  [1.5, 15], [2.5, 21], [4, 28], [6, 36], [10, 50],
+  [16, 68], [25, 89], [35, 110], [50, 133], [70, 171], [95, 207],
+];
+
+function nextMcbSize(current: number): number {
+  const rated = current * 1.25;
+  return STANDARD_MCB_SIZES.find(s => s >= rated) || STANDARD_MCB_SIZES[STANDARD_MCB_SIZES.length - 1];
+}
+
+function cableSizeForCurrent(current: number): number {
+  const needed = current * 1.25;
+  const match = CABLE_CURRENT_RATINGS.find(([, rating]) => rating >= needed);
+  return match ? match[0] : CABLE_CURRENT_RATINGS[CABLE_CURRENT_RATINGS.length - 1][0];
+}
+
+interface ProtectionSizing {
+  dcMcbPanelToCC: number;
+  dcMcbCCToBattery: number;
+  acMcbInverterToLoad: number;
+  dcBreakerBatteryToInverter: number;
+  spdRating: string;
+  earthWire: number;
+  isolatorSwitch: string;
+  cablePanelToCC: number;
+  cableCCToBattery: number;
+  cableBatteryToInverter: number;
+  cableInverterToLoad: number;
+}
 
 interface CalculationResults {
   minBatteries: number;
@@ -29,10 +63,12 @@ interface CalculationResults {
   panelArrayWattage: number;
   dailyEnergyProduction: number;
   recommendedChargeController: number;
+  protection: ProtectionSizing;
 }
 
 interface ProfessionalState {
-  loadSize: string;
+  solarLoad: string;
+  backupLoad: string;
   systemVoltage: string;
   backupHours: string;
   batteryVoltage: string;
@@ -51,7 +87,14 @@ const loadPersistedState = (): ProfessionalState | null => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Migration: if old state has loadSize, map it to both fields
+      if (parsed.loadSize && !parsed.solarLoad) {
+        parsed.solarLoad = parsed.loadSize;
+        parsed.backupLoad = parsed.loadSize;
+        delete parsed.loadSize;
+      }
+      return parsed;
     }
   } catch (e) {
     console.error('Failed to load professional state:', e);
@@ -71,8 +114,9 @@ const Professional = () => {
   const navigate = useNavigate();
   const persistedState = loadPersistedState();
 
-  // Load inputs
-  const [loadSize, setLoadSize] = useState<string>(persistedState?.loadSize || '');
+  // Dual load inputs
+  const [solarLoad, setSolarLoad] = useState<string>(persistedState?.solarLoad || '');
+  const [backupLoad, setBackupLoad] = useState<string>(persistedState?.backupLoad || '');
   const [systemVoltage, setSystemVoltage] = useState<string>(persistedState?.systemVoltage || '24');
   const [backupHours, setBackupHours] = useState<string>(persistedState?.backupHours || '4');
 
@@ -92,7 +136,8 @@ const Professional = () => {
   // Persist state on changes
   useEffect(() => {
     const state: ProfessionalState = {
-      loadSize,
+      solarLoad,
+      backupLoad,
       systemVoltage,
       backupHours,
       batteryVoltage,
@@ -105,10 +150,11 @@ const Professional = () => {
       showResults,
     };
     saveState(state);
-  }, [loadSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection, showResults]);
+  }, [solarLoad, backupLoad, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection, showResults]);
 
   const calculations = useMemo((): CalculationResults | null => {
-    const load = parseFloat(loadSize);
+    const sLoad = parseFloat(solarLoad);
+    const bLoad = parseFloat(backupLoad);
     const sysVolt = parseFloat(systemVoltage);
     const backup = parseFloat(backupHours);
     const batVolt = parseFloat(batteryVoltage);
@@ -117,51 +163,83 @@ const Professional = () => {
     const pnlWatt = parseFloat(panelWattage);
     const pnlVolt = parseFloat(panelVoltage);
 
-    if (!load || !sysVolt || !backup || !batVolt || !batAh || !sunHours || !pnlWatt || !pnlVolt) {
+    if (!sLoad || !bLoad || !sysVolt || !backup || !batVolt || !batAh || !sunHours || !pnlWatt || !pnlVolt) {
       return null;
     }
 
-    // Load is already in watts
-    const loadWatts = load;
-
-    // Calculate energy needed for backup (Wh)
-    const energyNeeded = loadWatts * backup;
-
-    // Account for depth of discharge (100%)
-    const dod = 1.0; // Depth of discharge
+    // Battery sizing based on backup load
+    const energyNeeded = bLoad * backup; // Wh
+    const dod = 1.0;
     const usableEnergy = energyNeeded / dod;
 
-    // Calculate battery bank requirements
     const batteriesInSeries = sysVolt / batVolt;
     const batteryBankWh = batVolt * batAh;
-    const totalBatteryWh = usableEnergy;
-    const parallelStrings = Math.ceil(totalBatteryWh / (batteryBankWh * batteriesInSeries));
+    const parallelStrings = Math.ceil(usableEnergy / (batteryBankWh * batteriesInSeries));
     const minBatteries = batteriesInSeries * parallelStrings;
 
-    // Calculate solar panel requirements
-    // Daily energy production should cover usage plus 20% for losses
-    const dailyUsage = loadWatts * 6; // Assume 6 hours of average daily use
-    const requiredDailyProduction = dailyUsage * 1.2;
-    const panelsNeeded = Math.ceil(requiredDailyProduction / (pnlWatt * sunHours));
-    
+    // Solar panel sizing: must power solar load during day AND charge batteries for backup
+    const dailySolarConsumption = sLoad * sunHours;
+    const dailyBackupEnergy = bLoad * backup;
+    const totalDailyEnergy = (dailySolarConsumption + dailyBackupEnergy) * 1.2; // 20% overhead
+    const panelsNeeded = Math.ceil(totalDailyEnergy / (pnlWatt * sunHours));
+
     // Panel array configuration
     let panelArrayVoltage = pnlVolt;
-    let panelArrayWattage = pnlWatt * panelsNeeded;
-    
+    const panelArrayWattage = pnlWatt * panelsNeeded;
+
     if (panelConnection === 'series') {
       panelArrayVoltage = pnlVolt * panelsNeeded;
     } else if (panelConnection === 'parallel') {
       panelArrayVoltage = pnlVolt;
     } else {
-      // Series-parallel: assume 2 in series
       panelArrayVoltage = pnlVolt * 2;
     }
 
     const dailyEnergyProduction = pnlWatt * panelsNeeded * sunHours;
 
-    // Charge controller sizing (add 25% safety margin)
+    // Charge controller sizing (25% safety margin)
     const maxCurrent = (pnlWatt * panelsNeeded) / sysVolt;
     const recommendedChargeController = Math.ceil(maxCurrent * 1.25 / 10) * 10;
+
+    // --- Protection & Breaker Sizing ---
+    const maxLoad = Math.max(sLoad, bLoad);
+
+    // Panel short circuit current (Isc ≈ Imp × 1.15, Imp = Pmax / Vmp)
+    const panelImp = pnlWatt / pnlVolt;
+    const panelIsc = panelImp * 1.15;
+    // For parallel panels
+    const parallelPanelStrings = panelConnection === 'parallel' ? panelsNeeded :
+      panelConnection === 'series-parallel' ? Math.ceil(panelsNeeded / 2) : 1;
+    const arrayIsc = panelIsc * parallelPanelStrings;
+
+    const dcMcbPanelToCC = nextMcbSize(arrayIsc);
+    const dcMcbCCToBattery = nextMcbSize(recommendedChargeController);
+    
+    // AC side (230V output)
+    const acLoadCurrent = maxLoad / 230;
+    const acMcbInverterToLoad = nextMcbSize(acLoadCurrent);
+
+    // DC battery to inverter
+    const dcInverterCurrent = maxLoad / sysVolt;
+    const dcBreakerBatteryToInverter = nextMcbSize(dcInverterCurrent);
+
+    // SPD rating based on array open circuit voltage (Voc ≈ Vmp × 1.2)
+    const arrayVoc = panelConnection === 'series' ? pnlVolt * 1.2 * panelsNeeded :
+      panelConnection === 'series-parallel' ? pnlVolt * 1.2 * Math.ceil(panelsNeeded / 2) :
+        pnlVolt * 1.2;
+    const spdRating = `Type 2 DC SPD, ${Math.ceil(arrayVoc / 100) * 100}V rated`;
+
+    // Earth wire: 16mm² standard for solar installations
+    const earthWire = 16;
+
+    // Isolator switch
+    const isolatorSwitch = `DC Isolator ${Math.ceil(arrayVoc / 100) * 100}V / ${nextMcbSize(arrayIsc)}A`;
+
+    // Cable sizing
+    const cablePanelToCC = cableSizeForCurrent(arrayIsc);
+    const cableCCToBattery = cableSizeForCurrent(recommendedChargeController);
+    const cableBatteryToInverter = cableSizeForCurrent(dcInverterCurrent);
+    const cableInverterToLoad = cableSizeForCurrent(acLoadCurrent);
 
     return {
       minBatteries: Math.ceil(minBatteries),
@@ -169,11 +247,24 @@ const Professional = () => {
       batteryBankAh: batAh * parallelStrings,
       totalPanels: panelsNeeded,
       panelArrayVoltage: Math.round(panelArrayVoltage),
-      panelArrayWattage: panelArrayWattage,
+      panelArrayWattage,
       dailyEnergyProduction: Math.round(dailyEnergyProduction),
       recommendedChargeController,
+      protection: {
+        dcMcbPanelToCC,
+        dcMcbCCToBattery,
+        acMcbInverterToLoad,
+        dcBreakerBatteryToInverter,
+        spdRating,
+        earthWire,
+        isolatorSwitch,
+        cablePanelToCC,
+        cableCCToBattery,
+        cableBatteryToInverter,
+        cableInverterToLoad,
+      },
     };
-  }, [loadSize, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection]);
+  }, [solarLoad, backupLoad, systemVoltage, backupHours, batteryVoltage, batteryAh, batteryConnection, solarHours, panelWattage, panelVoltage, panelConnection]);
 
   const handleCalculate = () => {
     if (calculations) {
@@ -182,7 +273,8 @@ const Professional = () => {
   };
 
   const handleReset = () => {
-    setLoadSize('');
+    setSolarLoad('');
+    setBackupLoad('');
     setSystemVoltage('24');
     setBackupHours('4');
     setBatteryVoltage('12');
@@ -204,6 +296,8 @@ const Professional = () => {
       month: 'long',
       day: 'numeric',
     });
+
+    const p = calculations.protection;
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -231,52 +325,18 @@ const Professional = () => {
       padding-bottom: 20px;
       border-bottom: 3px solid #FB8500;
     }
-    .header h1 { 
-      font-size: 28px; 
-      color: #1a1a2e;
-      margin: 0;
-    }
-    .header .date { 
-      color: #666; 
-      font-size: 14px;
-      text-align: right;
-    }
+    .header h1 { font-size: 28px; color: #1a1a2e; margin: 0; }
+    .header .date { color: #666; font-size: 14px; text-align: right; }
     .section { margin-bottom: 30px; }
     .section-title { 
-      font-size: 18px;
-      font-weight: 600;
-      color: #FB8500;
-      margin-bottom: 15px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #e0e0e0;
+      font-size: 18px; font-weight: 600; color: #FB8500;
+      margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;
     }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
-      margin-bottom: 25px;
-    }
-    .stat-card {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 15px;
-      text-align: center;
-    }
-    .stat-card.highlight {
-      background: #FB8500 !important;
-      color: white !important;
-    }
-    .stat-card.highlight .stat-label,
-    .stat-card.highlight .stat-value,
-    .stat-card.highlight .stat-unit {
-      color: white !important;
-    }
-    .stat-label { 
-      font-size: 12px; 
-      text-transform: uppercase;
-      opacity: 0.8;
-      margin-bottom: 4px;
-    }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: #f8f9fa; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card.highlight { background: #FB8500 !important; color: white !important; }
+    .stat-card.highlight .stat-label, .stat-card.highlight .stat-value, .stat-card.highlight .stat-unit { color: white !important; }
+    .stat-label { font-size: 12px; text-transform: uppercase; opacity: 0.8; margin-bottom: 4px; }
     .stat-value { font-size: 24px; font-weight: 700; }
     .stat-unit { font-size: 14px; opacity: 0.8; }
     .config-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -299,7 +359,8 @@ const Professional = () => {
     <div class="section-title">System Configuration</div>
     <table class="config-table">
       <tr><th>Parameter</th><th>Value</th></tr>
-      <tr><td>Load Size</td><td>${loadSize}W</td></tr>
+      <tr><td>Load During Solar Hours</td><td>${solarLoad}W</td></tr>
+      <tr><td>Load During Backup Hours</td><td>${backupLoad}W</td></tr>
       <tr><td>System Voltage</td><td>${systemVoltage}V</td></tr>
       <tr><td>Backup Hours</td><td>${backupHours} hours</td></tr>
       <tr><td>Battery Voltage</td><td>${batteryVoltage}V</td></tr>
@@ -339,9 +400,35 @@ const Professional = () => {
   </div>
 
   <div class="section">
+    <div class="section-title">Protection & Breaker Sizing</div>
+    <table class="config-table">
+      <tr><th>Component</th><th>Size</th></tr>
+      <tr><td>DC MCB (Panel → Charge Controller)</td><td>${p.dcMcbPanelToCC}A</td></tr>
+      <tr><td>DC MCB (Charge Controller → Battery)</td><td>${p.dcMcbCCToBattery}A</td></tr>
+      <tr><td>DC Breaker (Battery → Inverter)</td><td>${p.dcBreakerBatteryToInverter}A</td></tr>
+      <tr><td>AC MCB (Inverter → Load)</td><td>${p.acMcbInverterToLoad}A</td></tr>
+      <tr><td>Surge Protection Device (SPD)</td><td>${p.spdRating}</td></tr>
+      <tr><td>Earth Wire</td><td>${p.earthWire}mm² copper</td></tr>
+      <tr><td>DC Isolator Switch</td><td>${p.isolatorSwitch}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Cable Sizing</div>
+    <table class="config-table">
+      <tr><th>Run</th><th>Size (mm²)</th></tr>
+      <tr><td>Panel → Charge Controller</td><td>${p.cablePanelToCC}mm²</td></tr>
+      <tr><td>Charge Controller → Battery</td><td>${p.cableCCToBattery}mm²</td></tr>
+      <tr><td>Battery → Inverter</td><td>${p.cableBatteryToInverter}mm²</td></tr>
+      <tr><td>Inverter → Load</td><td>${p.cableInverterToLoad}mm²</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
     <div class="section-title">Important Notes</div>
     <div class="notes-box">
       <div class="list-item">20% solar production overhead is included for real-world conditions</div>
+      <div class="list-item">Cable sizes are minimum recommendations — increase for long cable runs</div>
       <div class="list-item">Always consult a qualified engineer for final system design</div>
     </div>
   </div>
@@ -371,28 +458,32 @@ const Professional = () => {
   const handleShare = async () => {
     if (!calculations) return;
 
+    const p = calculations.protection;
     const shareText = `Professional Solar System Report
 
 Configuration:
-• Load: ${loadSize}W @ ${systemVoltage}V
-• Backup: ${backupHours} hours
+• Solar Load: ${solarLoad}W | Backup Load: ${backupLoad}W
+• System: ${systemVoltage}V | Backup: ${backupHours}h
 • Battery: ${batteryVoltage}V ${batteryAh}Ah (${batteryConnection})
 • Solar: ${panelWattage}W panels @ ${solarHours}h/day (${panelConnection})
 
 Results:
-• Batteries needed: ${calculations.minBatteries} (${calculations.batteryBankVoltage}V/${calculations.batteryBankAh}Ah bank)
-• Solar panels: ${calculations.totalPanels} (${calculations.panelArrayWattage}W array)
+• Batteries: ${calculations.minBatteries} (${calculations.batteryBankVoltage}V/${calculations.batteryBankAh}Ah)
+• Solar panels: ${calculations.totalPanels} (${calculations.panelArrayWattage}W)
 • Daily production: ${calculations.dailyEnergyProduction} Wh
 • Charge controller: ${calculations.recommendedChargeController}A MPPT
+
+Protection:
+• DC MCB Panel→CC: ${p.dcMcbPanelToCC}A
+• DC MCB CC→Bat: ${p.dcMcbCCToBattery}A
+• DC Breaker Bat→Inv: ${p.dcBreakerBatteryToInverter}A
+• AC MCB Inv→Load: ${p.acMcbInverterToLoad}A
 
 Generated with InverterSize.com`;
 
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'Professional Solar System Report',
-          text: shareText,
-        });
+        await navigator.share({ title: 'Professional Solar System Report', text: shareText });
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
           copyToClipboard(shareText);
@@ -463,7 +554,7 @@ Generated with InverterSize.com`;
                   Professional System Calculator
                 </h1>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Configure your solar power system with precise calculations for batteries, panels, and charge controllers.
+                  Configure your solar power system with precise calculations for batteries, panels, charge controllers, and protection devices.
                 </p>
               </div>
             </div>
@@ -476,18 +567,37 @@ Generated with InverterSize.com`;
                     <Zap className="h-5 w-5 text-primary" />
                     Load Configuration
                   </CardTitle>
-                  <CardDescription>Set your load specifications</CardDescription>
+                  <CardDescription>Set your load for solar and backup hours</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="loadSize">Load Size (Watts)</Label>
+                    <Label htmlFor="solarLoad">Load During Solar Hours (Watts)</Label>
                     <Input
-                      id="loadSize"
+                      id="solarLoad"
                       type="number"
                       placeholder="e.g., 2000"
-                      value={loadSize}
-                      onChange={(e) => setLoadSize(e.target.value)}
+                      value={solarLoad}
+                      onChange={(e) => setSolarLoad(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                      Total wattage consumed when solar panels are generating power.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="backupLoad">Load During Backup Hours (Watts)</Label>
+                    <Input
+                      id="backupLoad"
+                      type="number"
+                      placeholder="e.g., 1500"
+                      value={backupLoad}
+                      onChange={(e) => setBackupLoad(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                      Total wattage consumed from battery when there is no solar (night/cloudy).
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -652,80 +762,163 @@ Generated with InverterSize.com`;
 
             {/* Results */}
             {showResults && calculations && (
-              <Card className="border-primary/50 bg-primary/5">
-                <CardHeader>
-                  <CardTitle className="text-primary">Calculation Results</CardTitle>
-                  <CardDescription>Based on your configuration</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-background rounded-lg p-4 border">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Battery className="h-4 w-4" />
-                        Minimum Batteries
+              <div className="space-y-6">
+                <Card className="border-primary/50 bg-primary/5">
+                  <CardHeader>
+                    <CardTitle className="text-primary">Calculation Results</CardTitle>
+                    <CardDescription>Based on your configuration</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-background rounded-lg p-4 border">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                          <Battery className="h-4 w-4" />
+                          Minimum Batteries
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">{calculations.minBatteries}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculations.batteryBankVoltage}V / {calculations.batteryBankAh}Ah bank
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-foreground">{calculations.minBatteries}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {calculations.batteryBankVoltage}V / {calculations.batteryBankAh}Ah bank
+
+                      <div className="bg-background rounded-lg p-4 border">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                          <Sun className="h-4 w-4" />
+                          Solar Panels Needed
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">{calculations.totalPanels}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculations.panelArrayWattage}W array
+                        </div>
+                      </div>
+
+                      <div className="bg-background rounded-lg p-4 border">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                          <Zap className="h-4 w-4" />
+                          Daily Production
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">{calculations.dailyEnergyProduction}</div>
+                        <div className="text-xs text-muted-foreground">Wh per day</div>
+                      </div>
+
+                      <div className="bg-background rounded-lg p-4 border">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                          <Settings2 className="h-4 w-4" />
+                          Charge Controller
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">{calculations.recommendedChargeController}A</div>
+                        <div className="text-xs text-muted-foreground">MPPT recommended</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Protection & Breaker Sizing */}
+                <Card className="border-warning/50 bg-warning/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-warning">
+                      <Shield className="h-5 w-5" />
+                      Protection & Breaker Sizing
+                    </CardTitle>
+                    <CardDescription>Circuit breakers, surge protection, and cable sizes</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Breakers */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3 text-foreground">Circuit Breakers (MCB)</h4>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">DC MCB: Panel → Charge Controller</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.dcMcbPanelToCC}A</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">DC MCB: Charge Controller → Battery</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.dcMcbCCToBattery}A</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">DC Breaker: Battery → Inverter</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.dcBreakerBatteryToInverter}A</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">AC MCB: Inverter → Load</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.acMcbInverterToLoad}A</div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-background rounded-lg p-4 border">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Sun className="h-4 w-4" />
-                        Solar Panels Needed
-                      </div>
-                      <div className="text-2xl font-bold text-foreground">{calculations.totalPanels}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {calculations.panelArrayWattage}W array
+                    {/* Protection Devices */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3 text-foreground">Protection Devices</h4>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">SPD / Lightning Arrestor</div>
+                          <div className="text-sm font-bold text-foreground">{calculations.protection.spdRating}</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">Earth Wire</div>
+                          <div className="text-sm font-bold text-foreground">{calculations.protection.earthWire}mm² copper + earth rod</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">DC Isolator Switch</div>
+                          <div className="text-sm font-bold text-foreground">{calculations.protection.isolatorSwitch}</div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-background rounded-lg p-4 border">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Zap className="h-4 w-4" />
-                        Daily Production
+                    {/* Cable Sizing */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3 text-foreground">Cable Sizing (Minimum)</h4>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">Panel → Charge Controller</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.cablePanelToCC}mm²</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">Charge Controller → Battery</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.cableCCToBattery}mm²</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">Battery → Inverter</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.cableBatteryToInverter}mm²</div>
+                        </div>
+                        <div className="bg-background rounded-lg p-3 border">
+                          <div className="text-xs text-muted-foreground mb-1">Inverter → Load</div>
+                          <div className="text-lg font-bold text-foreground">{calculations.protection.cableInverterToLoad}mm²</div>
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-foreground">{calculations.dailyEnergyProduction}</div>
-                      <div className="text-xs text-muted-foreground">Wh per day</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Actions & Notes */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex flex-wrap gap-3 justify-center mb-4">
+                      <Button onClick={handleDownload} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Download Report
+                      </Button>
+                      <Button variant="outline" onClick={handleShare} className="gap-2">
+                        <Share2 className="h-4 w-4" />
+                        Share Report
+                      </Button>
                     </div>
 
-                    <div className="bg-background rounded-lg p-4 border">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Settings2 className="h-4 w-4" />
-                        Charge Controller
-                      </div>
-                      <div className="text-2xl font-bold text-foreground">{calculations.recommendedChargeController}A</div>
-                      <div className="text-xs text-muted-foreground">MPPT recommended</div>
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-primary" />
+                        Important Notes
+                      </h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>20% solar production overhead is included for real-world conditions</li>
+                        <li>Cable sizes are minimum recommendations — increase for long cable runs</li>
+                        <li>MCB ratings include 25% safety margin above calculated current</li>
+                        <li>Always consult a qualified engineer for final system design</li>
+                      </ul>
                     </div>
-                  </div>
-
-                  <Separator className="my-4" />
-
-                  {/* Download & Share Buttons */}
-                  <div className="flex flex-wrap gap-3 justify-center mb-4">
-                    <Button onClick={handleDownload} className="gap-2">
-                      <Download className="h-4 w-4" />
-                      Download Report
-                    </Button>
-                    <Button variant="outline" onClick={handleShare} className="gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share Report
-                    </Button>
-                  </div>
-
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
-                      <Info className="h-4 w-4 text-primary" />
-                      Important Notes
-                    </h4>
-                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>20% solar production overhead is included for real-world conditions</li>
-                      <li>Always consult a qualified engineer for final system design</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </div>
         </main>

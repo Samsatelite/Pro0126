@@ -202,26 +202,22 @@ const Professional = () => {
     const recommendedChargeController = Math.ceil(maxCurrent * 1.25 / 10) * 10;
 
     // --- Protection & Breaker Sizing ---
+    // All protection sizes derived from the max load at the appropriate voltage
     const maxLoad = Math.max(sLoad, bLoad);
 
-    // Panel short circuit current (Isc ≈ Imp × 1.15, Imp = Pmax / Vmp)
-    const panelImp = pnlWatt / pnlVolt;
-    const panelIsc = panelImp * 1.15;
-    // For parallel panels
-    const parallelPanelStrings = panelConnection === 'parallel' ? panelsNeeded :
-      panelConnection === 'series-parallel' ? Math.ceil(panelsNeeded / 2) : 1;
-    const arrayIsc = panelIsc * parallelPanelStrings;
+    // DC side currents (load referred to DC system voltage)
+    const dcLoadCurrent = maxLoad / sysVolt;
 
-    const dcMcbPanelToCC = nextMcbSize(arrayIsc);
-    const dcMcbCCToBattery = nextMcbSize(recommendedChargeController);
-    
+    // DC MCB: Panel → Charge Controller (same current as DC load side)
+    const dcMcbPanelToCC = nextMcbSize(dcLoadCurrent);
+    // DC MCB: Charge Controller → Battery
+    const dcMcbCCToBattery = nextMcbSize(dcLoadCurrent);
+    // DC Breaker: Battery → Inverter
+    const dcBreakerBatteryToInverter = nextMcbSize(dcLoadCurrent);
+
     // AC side (230V output)
     const acLoadCurrent = maxLoad / 230;
     const acMcbInverterToLoad = nextMcbSize(acLoadCurrent);
-
-    // DC battery to inverter
-    const dcInverterCurrent = maxLoad / sysVolt;
-    const dcBreakerBatteryToInverter = nextMcbSize(dcInverterCurrent);
 
     // SPD rating based on array open circuit voltage (Voc ≈ Vmp × 1.2)
     const arrayVoc = panelConnection === 'series' ? pnlVolt * 1.2 * panelsNeeded :
@@ -233,12 +229,12 @@ const Professional = () => {
     const earthWire = 16;
 
     // Isolator switch
-    const isolatorSwitch = `DC Isolator ${Math.ceil(arrayVoc / 100) * 100}V / ${nextMcbSize(arrayIsc)}A`;
+    const isolatorSwitch = `DC Isolator ${Math.ceil(arrayVoc / 100) * 100}V / ${nextMcbSize(dcLoadCurrent)}A`;
 
-    // Cable sizing
-    const cablePanelToCC = cableSizeForCurrent(arrayIsc);
-    const cableCCToBattery = cableSizeForCurrent(recommendedChargeController);
-    const cableBatteryToInverter = cableSizeForCurrent(dcInverterCurrent);
+    // Cable sizing (all based on max load current at respective voltage)
+    const cablePanelToCC = cableSizeForCurrent(dcLoadCurrent);
+    const cableCCToBattery = cableSizeForCurrent(dcLoadCurrent);
+    const cableBatteryToInverter = cableSizeForCurrent(dcLoadCurrent);
     const cableInverterToLoad = cableSizeForCurrent(acLoadCurrent);
 
     return {

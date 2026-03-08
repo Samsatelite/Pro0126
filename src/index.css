@@ -4,52 +4,28 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 35 92% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --background: 220 26% 14%;
+    --foreground: 210 40% 98%;
+    --card: 220 26% 18%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 26% 18%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 174 72% 46%;
+    --primary-foreground: 220 26% 14%;
+    --secondary: 220 20% 22%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 20% 22%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 220 20% 25%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 35 92% 50%;
+    --border: 220 20% 24%;
+    --input: 220 20% 24%;
+    --ring: 174 72% 46%;
     --radius: 0.5rem;
-    --solar: 45 93% 47%;
-    --solar-light: 45 93% 90%;
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 15%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 35 92% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 35 92% 50%;
-    --solar: 45 93% 47%;
-    --solar-light: 45 93% 20%;
+    --solar: 174 72% 46%;
+    --solar-light: 174 72% 20%;
   }
 }
 

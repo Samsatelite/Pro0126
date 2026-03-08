@@ -1,64 +1,103 @@
+import { useState, useMemo } from "react";
 import { Header } from "@/components/Header";
-import { Sun, Zap, Calculator } from "lucide-react";
-import { motion } from "framer-motion";
+import { ApplianceSelector } from "@/components/ApplianceSelector";
+import { BatteryConfig } from "@/components/BatteryConfig";
+import { CalculationResults } from "@/components/CalculationResults";
+import {
+  APPLIANCES,
+  getRecommendedInverterSize,
+  calculateBackupTime,
+} from "@/data/appliances";
+import { toast } from "sonner";
 
 export default function Index() {
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [voltage, setVoltage] = useState("24V");
+  const [capacity, setCapacity] = useState("200Ah");
+  const [numBatteries, setNumBatteries] = useState(2);
+  const [dod, setDod] = useState(80);
+
+  const handleChange = (name: string, qty: number) => {
+    setQuantities((prev) => ({ ...prev, [name]: qty }));
+  };
+
+  const { totalLoad, peakSurge } = useMemo(() => {
+    let load = 0;
+    let surge = 0;
+    for (const appliance of APPLIANCES) {
+      const qty = quantities[appliance.name] ?? 0;
+      if (qty > 0) {
+        load += appliance.watts * qty;
+        surge += appliance.watts * (appliance.surge ?? 1) * qty;
+      }
+    }
+    return { totalLoad: load, peakSurge: surge };
+  }, [quantities]);
+
+  const inverterSize = useMemo(() => getRecommendedInverterSize(totalLoad), [totalLoad]);
+  const backupTime = useMemo(
+    () => calculateBackupTime(totalLoad, voltage, capacity, numBatteries, dod),
+    [totalLoad, voltage, capacity, numBatteries, dod]
+  );
+
+  const handleReset = () => {
+    setQuantities({});
+    toast.success("Calculator reset");
+  };
+
+  const handleDownload = () => {
+    // Generate a simple text-based summary for download
+    const lines = ["Solar Load Calculator Report", "===========================", ""];
+    for (const appliance of APPLIANCES) {
+      const qty = quantities[appliance.name] ?? 0;
+      if (qty > 0) {
+        lines.push(`${appliance.name}: ${qty} × ${appliance.watts}W = ${qty * appliance.watts}W`);
+      }
+    }
+    lines.push("");
+    lines.push(`Total Load: ${totalLoad}W`);
+    lines.push(`Peak Surge: ${peakSurge}W`);
+    lines.push(`Recommended Inverter: ${inverterSize} kVA`);
+    lines.push(`Battery: ${voltage} ${capacity} × ${numBatteries} (${dod}% DoD)`);
+    lines.push(`Backup Time: ${backupTime} hours`);
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "inverter-sizing-report.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Report downloaded");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12"
-        >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-solar/10 mb-6">
-            <Sun className="w-8 h-8 text-solar" />
+      <main className="container py-6">
+        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <ApplianceSelector quantities={quantities} onChange={handleChange} />
+          <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+            <BatteryConfig
+              voltage={voltage}
+              capacity={capacity}
+              numBatteries={numBatteries}
+              dod={dod}
+              onVoltageChange={setVoltage}
+              onCapacityChange={setCapacity}
+              onNumBatteriesChange={setNumBatteries}
+              onDodChange={setDod}
+            />
+            <CalculationResults
+              totalLoad={totalLoad}
+              peakSurge={peakSurge}
+              inverterSize={inverterSize}
+              backupTime={backupTime}
+              onReset={handleReset}
+              onDownload={handleDownload}
+            />
           </div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            Inverter Sizing Calculator
-          </h1>
-          <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">
-            Calculate your solar inverter requirements with ease.
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl mx-auto"
-        >
-          {[
-            {
-              icon: <Calculator className="w-6 h-6 text-primary" />,
-              title: "Quick Sizing",
-              desc: "Get instant inverter sizing based on your load requirements.",
-            },
-            {
-              icon: <Zap className="w-6 h-6 text-solar" />,
-              title: "Protection Sizing",
-              desc: "Determine breaker and cable sizes for safe installation.",
-            },
-            {
-              icon: <Sun className="w-6 h-6 text-primary" />,
-              title: "Solar Ready",
-              desc: "Optimised for off-grid and hybrid solar systems.",
-            },
-          ].map((card, i) => (
-            <div
-              key={i}
-              className="rounded-lg border border-border bg-card p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-muted mb-4">
-                {card.icon}
-              </div>
-              <h3 className="font-semibold text-card-foreground">{card.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{card.desc}</p>
-            </div>
-          ))}
-        </motion.div>
+        </div>
       </main>
     </div>
   );

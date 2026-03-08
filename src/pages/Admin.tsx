@@ -28,7 +28,7 @@ export default function Admin() {
     checkAuth();
   }, [navigate]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground bg-background">Loading...</div>;
   if (!authorized) return null;
 
   return (
